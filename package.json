@@ -3,12 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "nodemon",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:test": "npx tsx scripts/seed-test-accounts.ts",
+    "seed:admin": "npx tsx scripts/seed-admin.ts",
+    "repair:db": "npx tsx scripts/repair-database.ts",
+    "verify:db": "npx tsx scripts/verify-database.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
+    "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -20,6 +28,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "nodemon": "^3.1.14",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

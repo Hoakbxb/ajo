@@ -1,36 +1,147 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Friends Reward Circle
+
+A private community platform with a simple 2× matrix reward system. Built with **Next.js 16**, **Supabase (PostgreSQL)**, and **TypeScript**.
+
+## How It Works
+
+The cycle repeats forever:
+
+1. **Join** — you are merged under an active member who is building their matrix
+2. **Pay ₦5,000** — send payment to your assigned upline and wait for confirmation
+3. **Active** — once confirmed, you are active and your matrix starts at **0/2**
+4. **Build** — two members are placed under you; each pays you ₦5,000
+5. **Reward** — when both have paid, you receive **₦10,000**
+6. **Restart** — your matrix resets to **0**, status goes back to **Pending**
+7. **Merge** — you are placed under another member building their matrix and pay **₦5,000** again
+8. Go to step 3 — the cycle never ends
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- Supabase (PostgreSQL + Auth + Realtime)
+- TypeScript
+- Tailwind CSS 4
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20.9+
+- A [Supabase](https://supabase.com) project
+
+### Setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create `.env` in the project root with your credentials (see **Project Settings → API** in Supabase):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+3. Apply the database schema (tables `members`, `contributions` with Realtime enabled) via the Supabase SQL editor or CLI migrations.
+
+4. Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── members/        # Join, list, member details
+│   │   ├── contributions/  # Contribution tracking
+│   │   ├── matrix/         # Matrix tree data
+│   │   └── stats/          # Community statistics
+│   ├── join/               # Join form page
+│   ├── members/            # Members list
+│   ├── matrix/             # Matrix visualization
+│   └── dashboard/          # Member dashboard
+├── components/             # UI components
+├── lib/
+│   ├── matrix.ts           # Matrix placement & payout logic
+│   ├── db/repository.ts    # Supabase data access
+│   ├── supabase/           # Browser + server clients
+│   └── constants.ts        # ₦5,000 / ₦10,000 amounts
+├── hooks/
+│   └── useRealtimeDashboard.ts  # Live dashboard updates
+└── types/                  # Shared TypeScript types
+```
 
-## Learn More
+## Realtime
 
-To learn more about Next.js, take a look at the following resources:
+The dashboard subscribes to Supabase Realtime on `members` and `contributions` changes (filtered to the logged-in member). Updates appear instantly without polling.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Database scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Command | Description |
+|---------|-------------|
+| `npm run repair:db` | Repair cycle/member state and backfill transactions |
+| `npm run verify:db` | Quick state check |
+| `npm run seed:test` | Seed test accounts |
+| `npm run seed:admin` | Create or update the admin account |
 
-## Deploy on Vercel
+## Admin Portal
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Admin access uses the same Supabase Auth session with a `role` column on `members`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Create the admin account:
+
+```bash
+npm run seed:admin
+```
+
+Default credentials (override via `.env`):
+- Email: `admin@friendsrewardcircle.com`
+- Password: `admin1234`
+
+2. Sign in at [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+
+### Admin routes
+
+| Route | Description |
+|-------|-------------|
+| `/admin` | Community overview and stats |
+| `/admin/members` | Member directory |
+| `/admin/members/[id]` | Member detail and escalation actions |
+| `/admin/contributions` | All payment activity |
+| `/admin/escalations` | Members requiring admin contact |
+| `/admin/settings` | Configure contribution & payout amounts |
+| `/admin/activity` | Admin audit log of all actions |
+
+### Admin capabilities
+
+- **Manual matrix match** — assign a member to pay a specific upline (member detail page)
+- **Suspend / unsuspend** — block member login and activity
+- **Manage contributions** — confirm, decline, cancel, or change payment amounts
+- **Platform settings** — update contribution (₦5,000) and payout (₦10,000) amounts globally
+- **Activity log** — full audit trail of every admin action
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/members/join` | Join the community |
+| GET | `/api/members` | List all members |
+| GET | `/api/members/[id]` | Member details & progress |
+| GET | `/api/matrix` | Matrix tree structure |
+| GET | `/api/contributions` | All contributions |
+| POST | `/api/contributions/[id]/confirm` | Confirm a payment |
+| GET | `/api/transactions` | Member transaction ledger |
+| GET | `/api/stats` | Community statistics |
+
+## License
+
+Private project.
