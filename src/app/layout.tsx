@@ -18,10 +18,6 @@ export const metadata: Metadata = {
   title: SITE_NAME,
   description:
     "AJOFlow — a community contribution platform. Join voluntarily, contribute, and receive rewards when your matrix completes.",
-  icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
-  },
 };
 
 export default function RootLayout({
