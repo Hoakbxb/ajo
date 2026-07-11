@@ -10,10 +10,10 @@ import TransactionsContent from "./components/TransactionsContent";
 
 export default async function TransactionsPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/");
 
   const member = await findMemberById(session.memberId);
-  if (!member) redirect("/login");
+  if (!member) redirect("/");
 
   const ledger = await getMemberTransactionLedger(member.id);
   const transactions = toTransactionRecords(ledger);

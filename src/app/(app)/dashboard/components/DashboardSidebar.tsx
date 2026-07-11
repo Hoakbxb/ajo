@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -12,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { getInitials } from "./dashboard-ui";
+import { SITE_NAME } from "@/lib/brand";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
@@ -96,7 +98,7 @@ export default function DashboardSidebar({
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/");
     router.refresh();
   }
 
@@ -106,8 +108,8 @@ export default function DashboardSidebar({
     <>
       <header className="sticky top-0 z-40 flex items-center justify-between bg-[#0f172a] px-4 py-3 lg:hidden">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-xs font-bold text-white shadow-lg shadow-indigo-500/30">
-            FRC
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl">
+            <Image src="/logo.png" alt={`${SITE_NAME} logo`} width={40} height={40} className="h-full w-full object-cover" />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{fullName}</p>
@@ -126,11 +128,11 @@ export default function DashboardSidebar({
       <aside className="hidden w-[272px] shrink-0 flex-col bg-[#0f172a] lg:flex">
         <div className="border-b border-white/10 p-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white shadow-lg shadow-indigo-500/30">
-              FRC
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/30">
+              <Image src="/logo.png" alt={`${SITE_NAME} logo`} width={44} height={44} className="h-full w-full object-cover" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white">Friends Reward</p>
+              <p className="text-sm font-bold text-white">{SITE_NAME}</p>
               <p className="text-xs text-slate-400">Member Portal</p>
             </div>
           </div>

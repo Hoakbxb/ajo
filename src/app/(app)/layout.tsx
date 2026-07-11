@@ -9,15 +9,15 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/");
 
   if (session.role === "admin") redirect("/admin");
 
   const member = await findMemberById(session.memberId);
 
-  if (!member) redirect("/login");
+  if (!member) redirect("/");
 
-  if (member.isSuspended) redirect("/login?error=suspended");
+  if (member.isSuspended) redirect("/?error=suspended");
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8fafc] lg:flex-row">

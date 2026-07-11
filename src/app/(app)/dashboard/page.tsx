@@ -4,7 +4,7 @@ import DashboardContent from "./components/DashboardContent";
 
 export default async function DashboardPage() {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/");
 
   return <DashboardContent memberId={session.memberId} />;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ConditionalChrome from "@/components/ConditionalChrome";
+import { SITE_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Friends Reward Circle",
+  title: SITE_NAME,
   description:
-    "A private community with a simple 2× matrix reward system. Join voluntarily, contribute ₦5,000, and receive ₦10,000 when your matrix completes.",
+    "AJOFlow — a community contribution platform. Join voluntarily, contribute, and receive rewards when your matrix completes.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

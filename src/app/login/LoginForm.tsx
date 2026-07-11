@@ -3,9 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-const inputClass =
-  "mt-1.5 w-full rounded-xl border border-emerald-200 px-4 py-3 text-emerald-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20";
+import {
+  AuthError,
+  AuthField,
+  authInputClass,
+  authPrimaryBtnClass,
+} from "@/components/auth/auth-ui";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -38,17 +41,10 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <AuthError message={error} />
 
-      <div>
-        <label className="block text-sm font-medium text-emerald-900">
-          Phone Number
-        </label>
+      <AuthField label="Phone number">
         <input
           type="tel"
           required
@@ -61,38 +57,38 @@ export default function LoginForm() {
               phone: e.target.value.replace(/\D/g, "").slice(0, 11),
             })
           }
-          className={inputClass}
+          className={authInputClass}
           placeholder="08012345678"
         />
-      </div>
+      </AuthField>
 
-      <div>
-        <label className="block text-sm font-medium text-emerald-900">
-          Password
-        </label>
+      <AuthField label="Password">
         <input
           type="password"
           required
           autoComplete="current-password"
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
-          className={inputClass}
+          className={authInputClass}
           placeholder="Enter your password"
         />
-      </div>
+      </AuthField>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl bg-emerald-600 py-3.5 font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+        className={`${authPrimaryBtnClass} w-full`}
       >
-        {loading ? "Signing in..." : "Sign In"}
+        {loading ? "Signing in..." : "Sign in"}
       </button>
 
-      <p className="text-center text-sm text-emerald-700/70">
-        Not a member yet?{" "}
-        <Link href="/join" className="font-medium text-emerald-600 hover:underline">
-          Join the community
+      <p className="text-center text-sm text-slate-500">
+        New here?{" "}
+        <Link
+          href="/join"
+          className="font-medium text-slate-900 underline-offset-4 hover:underline"
+        >
+          Create an account
         </Link>
       </p>
     </form>

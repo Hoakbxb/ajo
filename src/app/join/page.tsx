@@ -1,23 +1,33 @@
 import JoinForm from "@/components/JoinForm";
+import { AuthLink, AuthShell } from "@/components/auth/auth-ui";
+import { SITE_NAME } from "@/lib/brand";
 
 export default function JoinPage() {
   return (
-    <div className="mx-auto max-w-lg px-4 py-12 sm:px-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-emerald-950">Join the Community</h1>
-        <p className="mt-2 text-emerald-700/70">
-          Fill in your details to join the next available matrix position
+    <AuthShell
+      title="Create your account"
+      description="Register in a few steps to join the next available matrix position."
+      aside={
+        <>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Join {SITE_NAME}
+          </p>
+          <h2 className="text-3xl font-semibold leading-tight tracking-tight xl:text-4xl">
+            Start your contribution journey.
+          </h2>
+          <p className="max-w-sm text-sm leading-relaxed text-slate-400">
+            Complete your profile, set a secure password, and add payout details.
+            One step at a time.
+          </p>
+        </>
+      }
+      footer={
+        <p className="text-slate-500">
+          Already have an account? <AuthLink href="/">Sign in</AuthLink>
         </p>
-        <p className="mt-2 text-sm text-emerald-600">
-          Already a member?{" "}
-          <a href="/login" className="font-medium hover:underline">
-            Sign in
-          </a>
-        </p>
-      </div>
-      <div className="mt-8 rounded-2xl border border-emerald-900/10 bg-white p-6 shadow-sm sm:p-8">
-        <JoinForm />
-      </div>
-    </div>
+      }
+    >
+      <JoinForm />
+    </AuthShell>
   );
 }
