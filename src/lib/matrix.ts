@@ -700,8 +700,11 @@ export async function approveContribution(
   if (contribution.status === "confirmed") {
     throw new Error("Contribution already confirmed");
   }
-  if (contribution.status !== "awaiting_confirmation") {
-    throw new Error("No payment claim awaiting your confirmation");
+  if (
+    contribution.status !== "awaiting_confirmation" &&
+    contribution.status !== "pending"
+  ) {
+    throw new Error("This payment can no longer be confirmed");
   }
 
   const payer = await findMemberById(contribution.fromMemberId);
@@ -744,8 +747,11 @@ export async function declineContribution(
   if (contribution.toMemberId !== recipientMemberId) {
     throw new Error("You can only decline payments sent to you");
   }
-  if (contribution.status !== "awaiting_confirmation") {
-    throw new Error("No payment claim awaiting your confirmation");
+  if (
+    contribution.status !== "awaiting_confirmation" &&
+    contribution.status !== "pending"
+  ) {
+    throw new Error("This payment can no longer be declined");
   }
 
   const priorRejection = await findOneContribution({

@@ -89,14 +89,12 @@ export function IncomingContributionModal({
           id="incoming-contribution-title"
           className="mt-4 text-xl font-bold text-slate-900"
         >
-          {awaiting.length > 0
-            ? "Approve or Reject Payment"
-            : "Incoming Members"}
+          Approve or Reject Payment
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           {awaiting.length > 0
             ? "A member says they sent you money. Approve or reject within 30 minutes."
-            : "These members are assigned to pay you in the matrix."}
+            : "These members are assigned to pay you. Approve once you receive payment, or reject to release the slot."}
         </p>
 
         <div className="mt-5 space-y-4">
@@ -172,25 +170,37 @@ export function IncomingContributionModal({
               <span className="mt-2 inline-block rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
                 Awaiting payment
               </span>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => onApprove(c._id)}
+                  disabled={acting === c._id}
+                  className="flex-1 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {acting === c._id ? "Approving..." : "Approve"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDecline(c._id)}
+                  disabled={acting === c._id || c.canDecline === false}
+                  className="flex-1 rounded-lg border border-red-300 bg-white px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {acting === c._id ? "..." : "Reject"}
+                </button>
+              </div>
+              {c.canDecline === false && (
+                <p className="mt-2 text-xs text-red-600">
+                  You have already rejected this member once. Contact admin for help.
+                </p>
+              )}
             </div>
           ))}
         </div>
 
-        {awaiting.length === 0 && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-5 w-full rounded-lg bg-slate-900 py-3.5 font-semibold text-white hover:bg-slate-800"
-          >
-            Got it
-          </button>
-        )}
-
-        {awaiting.length > 0 && (
-          <p className="mt-4 text-center text-xs text-slate-500">
-            Only confirm if you have received the exact amount in your bank account.
-          </p>
-        )}
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Only approve if you have received the exact amount in your bank account.
+        </p>
       </div>
     </div>,
     document.body
