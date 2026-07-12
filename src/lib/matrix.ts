@@ -41,6 +41,11 @@ import {
   hasConfirmedPaymentForCycle,
   syncPaidStateForCurrentCycle,
   canAssignNewPayment,
+  getAssignedPayerIds,
+  hasConfirmedPaymentToUpline,
+  nextOpenPositionForUpline,
+  pruneDuplicatePayerAssignments,
+  uplineHasOpenPaymentSlot,
   uplineMatrixReadyForPayout,
 } from "@/lib/cycle-payment";
 import {
@@ -62,7 +67,7 @@ interface Slot {
 
 export type AssignMemberResult =
   | { assigned: true; newParent: Member | null }
-  | { assigned: false; waiting: true; rematchAfter: Date };
+  | { assigned: false; waiting: true; rematchAfter: Date | null };
 
 export interface MatrixNode {
   _id: string;
@@ -101,12 +106,13 @@ function slotsFilled(member: Member): number {
   return (member.leftChildId ? 1 : 0) + (member.rightChildId ? 1 : 0);
 }
 
-function isEligibleUpline(member: Member): boolean {
+async function isEligibleUpline(member: Member): Promise<boolean> {
   return (
     canReceiveMemberPayments(member) &&
     member.status === "active" &&
     member.hasPaidContribution &&
-    openPositions(member).length > 0
+    openPositions(member).length > 0 &&
+    (await uplineHasOpenPaymentSlot(member))
   );
 }
 
@@ -178,14 +184,21 @@ async function detachFromParent(member: Member) {
 }
 
 export async function findPaymentSlot(
-  excludeMemberIds: string[] = []
+  excludeMemberIds: string[] = [],
+  payerMemberId?: string
 ): Promise<Slot | null> {
   const exclude = new Set(excludeMemberIds);
   const eligible: Member[] = [];
 
   const builders = await findActiveBuilders();
   for (const m of builders) {
-    if (exclude.has(m.id) || !isEligibleUpline(m)) continue;
+    if (exclude.has(m.id) || !(await isEligibleUpline(m))) continue;
+    if (
+      payerMemberId &&
+      (await hasConfirmedPaymentToUpline(payerMemberId, m.id))
+    ) {
+      continue;
+    }
     eligible.push(m);
   }
 
@@ -196,7 +209,8 @@ export async function findPaymentSlot(
   const pool = withOneSlot.length > 0 ? withOneSlot : eligible;
 
   const parent = sortFirstComeFirstServed(pool)[0];
-  const position = openPositions(parent)[0];
+  const position = await nextOpenPositionForUpline(parent);
+  if (!position) return null;
 
   return { parent, position, level: parent.matrixLevel + 1 };
 }
@@ -210,23 +224,37 @@ async function mergeToSlot(member: Member, slot: Slot) {
     throw new Error("Cannot assign payment to an admin account");
   }
 
-  await detachFromParent(member);
+  const payer = (await findMemberById(member.id)) ?? member;
+  const freshParent = (await findMemberById(slot.parent.id)) ?? slot.parent;
+  slot.parent = freshParent;
 
-  if (!(await canAssignNewPayment(member))) {
-    await syncPaidStateForCurrentCycle(member);
+  if (await hasConfirmedPaymentToUpline(payer.id, freshParent.id)) {
+    await syncPaidStateForCurrentCycle(payer);
     return;
   }
 
-  const cycleNumber = getCurrentCycleNumber(member);
-  const existingForCycle = await getOutgoingForCycle(member.id, cycleNumber);
+  if (!(await canAssignNewPayment(payer))) {
+    await syncPaidStateForCurrentCycle(payer);
+    return;
+  }
+
+  const openPosition = await nextOpenPositionForUpline(freshParent);
+  if (!openPosition || openPosition !== slot.position) {
+    return;
+  }
+
+  await detachFromParent(payer);
+
+  const cycleNumber = getCurrentCycleNumber(payer);
+  const existingForCycle = await getOutgoingForCycle(payer.id, cycleNumber);
   if (existingForCycle) {
     if (existingForCycle.status === "confirmed") {
-      await syncPaidStateForCurrentCycle(member);
+      await syncPaidStateForCurrentCycle(payer);
     }
     return;
   }
 
-  const updated = await updateMember(member.id, {
+  const updated = await updateMember(payer.id, {
     parentId: slot.parent.id,
     position: slot.position,
     matrixLevel: slot.level,
@@ -239,9 +267,9 @@ async function mergeToSlot(member: Member, slot: Slot) {
   Object.assign(member, updated);
 
   const childField = slot.position === "left" ? "leftChildId" : "rightChildId";
-  await updateMember(slot.parent.id, { [childField]: member.id });
+  await updateMember(slot.parent.id, { [childField]: payer.id });
 
-  await createOutgoingContributionForCycle(member, slot.parent.id);
+  await createOutgoingContributionForCycle(payer, slot.parent.id);
 }
 
 async function queueForMerge(member: Member): Promise<Date> {
@@ -301,11 +329,11 @@ export async function tryAssignMemberToPaymentSlot(
 
   const excludeIds = [...excludeMemberIds, member.id];
 
-  let slot = await findPaymentSlot(excludeIds);
+  let slot = await findPaymentSlot(excludeIds, member.id);
   while (slot) {
     if (!(await wouldCreateCycle(member, slot.parent))) break;
     excludeIds.push(slot.parent.id);
-    slot = await findPaymentSlot(excludeIds);
+    slot = await findPaymentSlot(excludeIds, member.id);
   }
 
   if (!slot) {
@@ -406,7 +434,10 @@ export async function processPendingMerges() {
   for (const member of queue) {
     if (member.isSuspended) continue;
     if (member.rematchAfter && member.rematchAfter > new Date()) continue;
-    await tryAssignMemberToPaymentSlot(member, [], {
+    await syncPaidStateForCurrentCycle(member);
+    const fresh = await findMemberById(member.id);
+    if (fresh?.hasPaidContribution && fresh.status === "active") continue;
+    await tryAssignMemberToPaymentSlot(fresh ?? member, [], {
       allowBeforeMatrixComplete: true,
       scheduleWaitOnNoSlot: true,
     });
@@ -479,6 +510,8 @@ export async function joinMatrix(data: {
 }
 
 export async function repairStuckAfterMatrixComplete() {
+  await pruneDuplicatePayerAssignments();
+
   const allMembers = await findAllMembers();
   for (const m of allMembers) {
     await syncPaidStateForCurrentCycle(m);
@@ -494,7 +527,26 @@ export async function repairStuckAfterMatrixComplete() {
     }
     const field = child.position === "left" ? "leftChildId" : "rightChildId";
     if (parent[field] !== child.id) {
-      await updateMember(child.id, { parentId: null });
+      if (!parent[field]) {
+        await updateMember(parent.id, { [field]: child.id });
+      } else {
+        await updateMember(child.id, { parentId: null });
+      }
+    }
+  }
+
+  for (const child of withParent.filter((m) => m.parentId)) {
+    const outgoing = await findOneContribution({
+      fromMemberId: child.id,
+      status: ["pending", "awaiting_confirmation"],
+    });
+    if (outgoing && outgoing.toMemberId !== child.parentId) {
+      if (await hasConfirmedPaymentToUpline(child.id, child.parentId!)) {
+        await deleteContributionById(outgoing.id);
+        continue;
+      }
+      await deleteContributionById(outgoing.id);
+      await createOutgoingContributionForCycle(child, child.parentId!);
     }
   }
 
@@ -546,12 +598,20 @@ export async function repairStuckAfterMatrixComplete() {
       continue;
     }
 
-    const position: ChildPosition | null = !parent.leftChildId
-      ? "left"
-      : !parent.rightChildId
-        ? "right"
-        : null;
+    const assigned = await getAssignedPayerIds(parent);
+    if (assigned.size >= 2 && !assigned.has(m.id)) {
+      await deleteContributionById(outgoing.id);
+      await updateMember(m.id, { parentId: null, rematchAfter: new Date(0) });
+      continue;
+    }
 
+    if (await hasConfirmedPaymentToUpline(m.id, parent.id)) {
+      await deleteContributionById(outgoing.id);
+      await syncPaidStateForCurrentCycle(m);
+      continue;
+    }
+
+    const position = await nextOpenPositionForUpline(parent);
     if (!position) {
       await deleteContributionById(outgoing.id);
       await updateMember(m.id, { rematchAfter: new Date(0) });
@@ -622,6 +682,7 @@ async function expireTimedOutClaims() {
 
 export async function maintainMatrixState() {
   await migrateMemberStatuses();
+  await pruneDuplicatePayerAssignments();
   await detachPaymentsToAdmins();
   await detachPaymentsToSuspended();
   await completeReadyCycles();

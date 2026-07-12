@@ -5,6 +5,8 @@ import {
   contributionExists,
   createContribution,
   deleteContributions,
+  findActiveBuilders,
+  findAllMembers,
   findContributions,
   findMemberById,
   findOneContribution,
@@ -65,16 +67,37 @@ export async function enforceOneActiveOutgoing(memberId: string) {
   return actives[actives.length - 1];
 }
 
+/** True when this member already completed a payment to the given upline. */
+export async function hasConfirmedPaymentToUpline(
+  memberId: string,
+  uplineId: string
+): Promise<boolean> {
+  return !!(await findOneContribution({
+    fromMemberId: memberId,
+    toMemberId: uplineId,
+    status: "confirmed",
+  }));
+}
+
 /** Activate member when a confirmed payment exists for the current cycle. */
 export async function syncPaidStateForCurrentCycle(member: Member) {
   if (member.hasPaidContribution && member.status === "active") return;
 
   const cycleNumber = getCurrentCycleNumber(member);
-  const confirmed = await findOneContribution({
+  let confirmed = await findOneContribution({
     fromMemberId: member.id,
     cycleNumber,
     status: "confirmed",
   });
+
+  // Child paid their upline but cycle_number may not match getCurrentCycleNumber.
+  if (!confirmed && member.parentId) {
+    confirmed = await findOneContribution({
+      fromMemberId: member.id,
+      toMemberId: member.parentId,
+      status: "confirmed",
+    });
+  }
 
   if (!confirmed) return;
 
@@ -116,6 +139,8 @@ export async function createOutgoingContributionForCycle(
   const cycleNumber = getCurrentCycleNumber(member);
 
   if (member.hasPaidContribution || member.isSuspended) return null;
+
+  if (await hasConfirmedPaymentToUpline(member.id, toMemberId)) return null;
 
   const existing = await getOutgoingForCycle(member.id, cycleNumber);
   if (existing) {
@@ -187,6 +212,133 @@ export async function canAssignNewPayment(member: Member): Promise<boolean> {
   if (member.hasPaidContribution || member.status === "active") return false;
   const cycleNumber = getCurrentCycleNumber(member);
   return !(await hasConfirmedPaymentForCycle(member, cycleNumber));
+}
+
+/** Distinct payers currently assigned to an upline's open matrix (tree + pending). */
+export async function getAssignedPayerIds(upline: Member): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (upline.leftChildId) ids.add(upline.leftChildId);
+  if (upline.rightChildId) ids.add(upline.rightChildId);
+
+  const pendingIncoming = await findContributions({
+    toMemberId: upline.id,
+    status: [...ACTIVE_OUTGOING_STATUSES],
+  });
+  for (const c of pendingIncoming) {
+    ids.add(c.fromMemberId);
+  }
+  return ids;
+}
+
+/**
+ * Remove duplicate payer assignments: same member paying one upline twice,
+ * or more than two payers assigned to one upline's current matrix.
+ */
+export async function pruneDuplicatePayerAssignments(): Promise<void> {
+  const members = await findAllMembers();
+
+  for (const m of members) {
+    const confirmedOutgoing = await findContributions({
+      fromMemberId: m.id,
+      status: "confirmed",
+    });
+
+    for (const confirmed of confirmedOutgoing) {
+      const duplicates = await findContributions({
+        fromMemberId: m.id,
+        toMemberId: confirmed.toMemberId,
+        status: [...ACTIVE_OUTGOING_STATUSES],
+      });
+      for (const dup of duplicates) {
+        await deleteContributions({ ids: [dup.id] });
+      }
+    }
+
+    if (m.parentId && !m.hasPaidContribution) {
+      const paidParent = await hasConfirmedPaymentToUpline(m.id, m.parentId);
+      if (paidParent) {
+        await updateMember(m.id, {
+          hasPaidContribution: true,
+          status: "active",
+        });
+        const extraPending = await findContributions({
+          fromMemberId: m.id,
+          toMemberId: m.parentId,
+          status: [...ACTIVE_OUTGOING_STATUSES],
+        });
+        if (extraPending.length) {
+          await deleteContributions({ ids: extraPending.map((c) => c.id) });
+        }
+      }
+    }
+  }
+
+  const builders = await findActiveBuilders();
+  for (const upline of builders) {
+    const pendingIncoming = await findContributions({
+      toMemberId: upline.id,
+      status: [...ACTIVE_OUTGOING_STATUSES],
+    });
+
+    for (const c of pendingIncoming) {
+      if (await hasConfirmedPaymentToUpline(c.fromMemberId, upline.id)) {
+        await deleteContributions({ ids: [c.id] });
+        const payer = await findMemberById(c.fromMemberId);
+        if (payer && !payer.hasPaidContribution) {
+          await updateMember(payer.id, {
+            hasPaidContribution: true,
+            status: "active",
+          });
+        }
+      }
+    }
+
+    const fresh = (await findMemberById(upline.id)) ?? upline;
+    let assigned = await getAssignedPayerIds(fresh);
+    if (assigned.size <= 2) continue;
+
+    const stillPending = await findContributions({
+      toMemberId: fresh.id,
+      status: [...ACTIVE_OUTGOING_STATUSES],
+    });
+    const treeIds = new Set(
+      [fresh.leftChildId, fresh.rightChildId].filter(Boolean) as string[]
+    );
+
+    const excess = stillPending
+      .filter((c) => !treeIds.has(c.fromMemberId))
+      .sort(
+        (a, b) =>
+          (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)
+      );
+
+    for (const c of excess) {
+      assigned = await getAssignedPayerIds(
+        (await findMemberById(fresh.id)) ?? fresh
+      );
+      if (assigned.size <= 2) break;
+
+      await deleteContributions({ ids: [c.id] });
+      await updateMember(c.fromMemberId, {
+        parentId: null,
+        rematchAfter: new Date(0),
+      });
+    }
+  }
+}
+
+export async function uplineHasOpenPaymentSlot(upline: Member): Promise<boolean> {
+  const assigned = await getAssignedPayerIds(upline);
+  return assigned.size < 2;
+}
+
+export async function nextOpenPositionForUpline(
+  upline: Member
+): Promise<"left" | "right" | null> {
+  if (!(await uplineHasOpenPaymentSlot(upline))) return null;
+  if (!upline.leftChildId) return "left";
+  if (!upline.rightChildId) return "right";
+  return null;
 }
 
 /** Both matrix slots filled with downlines who confirmed payment to this upline. */
