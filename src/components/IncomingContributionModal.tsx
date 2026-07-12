@@ -18,12 +18,22 @@ function PayerDetails({
   metaClassName?: string;
 }) {
   return (
-    <>
-      <p className={`text-lg font-bold ${nameClassName}`}>{payer.fullName}</p>
+    <div className="mt-2 space-y-2 text-sm">
+      <div className="flex justify-between gap-4">
+        <span className={metaClassName}>Name</span>
+        <span className={`text-right font-medium ${nameClassName}`}>
+          {payer.fullName}
+        </span>
+      </div>
       {payer.phone && (
-        <p className={`text-sm ${metaClassName}`}>{payer.phone}</p>
+        <div className="flex justify-between gap-4">
+          <span className={metaClassName}>Phone</span>
+          <span className={`font-mono font-medium ${nameClassName}`}>
+            {payer.phone}
+          </span>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

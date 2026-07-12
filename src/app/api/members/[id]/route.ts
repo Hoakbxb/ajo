@@ -34,6 +34,7 @@ export async function GET(
       "memberId",
       "fullName",
       "email",
+      "phone",
       "bankName",
       "bankCode",
       "accountNumber",

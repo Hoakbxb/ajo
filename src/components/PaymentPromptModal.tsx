@@ -6,6 +6,7 @@ import { formatNaira } from "@/components/StatCard";
 interface PaymentPromptModalProps {
   open: boolean;
   parentName: string;
+  parentPhone?: string;
   bankName: string;
   accountNumber: string;
   accountName: string;
@@ -19,6 +20,7 @@ interface PaymentPromptModalProps {
 export function PaymentPromptModal({
   open,
   parentName,
+  parentPhone,
   bankName,
   accountNumber,
   accountName,
@@ -115,9 +117,18 @@ export function PaymentPromptModal({
 
         <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50/50 p-4">
           <p className="text-sm font-semibold text-orange-900">Pay to:</p>
-          <p className="mt-2 text-lg font-bold text-orange-950">{parentName}</p>
 
           <div className="mt-4 space-y-2 text-sm text-orange-800">
+            <div className="flex justify-between gap-4">
+              <span className="text-orange-600">Name</span>
+              <span className="text-right font-medium">{parentName}</span>
+            </div>
+            {parentPhone && (
+              <div className="flex justify-between gap-4">
+                <span className="text-orange-600">Phone</span>
+                <span className="font-mono font-medium">{parentPhone}</span>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <span className="text-orange-600">Bank</span>
               <span className="text-right font-medium">{bankName}</span>

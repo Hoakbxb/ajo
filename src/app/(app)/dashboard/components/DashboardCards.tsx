@@ -345,6 +345,9 @@ export function IncomingPaymentAlert({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-slate-900">{c.fromMemberId.fullName}</p>
+                  {c.fromMemberId.phone && (
+                    <p className="text-xs text-slate-500">{c.fromMemberId.phone}</p>
+                  )}
                   <p className="text-lg font-semibold text-slate-900">{formatNaira(c.amount)}</p>
                 </div>
                 <ProBadge accent="amber">

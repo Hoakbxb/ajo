@@ -355,6 +355,7 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
         <PaymentPromptModal
           open={showPaymentModal}
           parentName={member.parentId.fullName}
+          parentPhone={member.parentId.phone}
           bankName={member.parentId.bankName}
           accountNumber={member.parentId.accountNumber}
           accountName={member.parentId.accountName}

@@ -88,6 +88,7 @@ export interface MemberDashboardData {
       memberId: string;
       fullName: string;
       email: string;
+      phone: string;
       bankName: string;
       accountNumber: string;
       accountName: string;
