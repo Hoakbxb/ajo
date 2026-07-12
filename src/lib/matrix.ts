@@ -1,6 +1,7 @@
 /**
  * Matrix cycle engine (Supabase-backed)
  */
+import { randomInt } from "crypto";
 import {
   createMember,
   createContribution,
@@ -116,13 +117,24 @@ async function isEligibleUpline(member: Member): Promise<boolean> {
   );
 }
 
-function memberSortTime(member: Member): number {
-  return member.joinedAt?.getTime() ?? member.createdAt?.getTime() ?? 0;
+function shuffleMembers(members: Member[]): Member[] {
+  const copy = [...members];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
-/** Oldest members first (first come, first served). */
-function sortFirstComeFirstServed(members: Member[]): Member[] {
-  return [...members].sort((a, b) => memberSortTime(a) - memberSortTime(b));
+/** Random upline pick — prefer members with fewer completed cycles so nobody is left behind. */
+function pickFairRandomMember(members: Member[]): Member | null {
+  if (members.length === 0) return null;
+  if (members.length === 1) return members[0];
+
+  const minCycles = Math.min(...members.map((m) => m.cyclesCompleted ?? 0));
+  const tier = members.filter((m) => (m.cyclesCompleted ?? 0) === minCycles);
+  const pool = tier.length > 0 ? tier : members;
+  return pool[randomInt(pool.length)] ?? null;
 }
 
 async function getSubtreeIds(anchor: Member): Promise<string[]> {
@@ -204,11 +216,9 @@ export async function findPaymentSlot(
 
   if (eligible.length === 0) return null;
 
-  // Complete one builder's matrix (both slots) before assigning to the next payee.
-  const withOneSlot = eligible.filter((m) => slotsFilled(m) === 1);
-  const pool = withOneSlot.length > 0 ? withOneSlot : eligible;
+  const parent = pickFairRandomMember(eligible);
+  if (!parent) return null;
 
-  const parent = sortFirstComeFirstServed(pool)[0];
   const position = await nextOpenPositionForUpline(parent);
   if (!position) return null;
 
@@ -423,7 +433,7 @@ export const resetAndRematchAfterMatrixComplete = async (memberId: string) => {
 export const checkAndProcessPayout = checkAndCompleteCycle;
 
 export async function processPendingMerges() {
-  const queue = sortFirstComeFirstServed(
+  const queue = shuffleMembers(
     await findMembers({
       status: "pending",
       parentId: null,
