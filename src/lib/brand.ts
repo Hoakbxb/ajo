@@ -1,1 +1,1 @@
-export const SITE_NAME = "AJOFlow";
+export const SITE_NAME = "Wealth Circle";

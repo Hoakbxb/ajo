@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: SITE_NAME,
   description:
-    "AJOFlow — a community contribution platform. Join voluntarily, contribute, and receive rewards when your matrix completes.",
+    "Wealth Circle — a community contribution platform. Join voluntarily, contribute, and receive rewards when your matrix completes.",
 };
 
 export default function RootLayout({
