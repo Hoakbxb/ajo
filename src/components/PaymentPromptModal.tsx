@@ -14,6 +14,8 @@ interface PaymentPromptModalProps {
   contributionId: string;
   onClaim: (id: string, file: File) => void;
   claiming: boolean;
+  onReassign?: () => void;
+  reassigning?: boolean;
   onClose: () => void;
 }
 
@@ -28,6 +30,8 @@ export function PaymentPromptModal({
   contributionId,
   onClaim,
   claiming,
+  onReassign,
+  reassigning = false,
   onClose,
 }: PaymentPromptModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -126,7 +130,12 @@ export function PaymentPromptModal({
             {parentPhone && (
               <div className="flex justify-between gap-4">
                 <span className="text-orange-600">Phone</span>
-                <span className="font-mono font-medium">{parentPhone}</span>
+                <a
+                  href={`tel:${parentPhone}`}
+                  className="font-mono font-medium text-orange-900 underline-offset-2 hover:underline"
+                >
+                  {parentPhone}
+                </a>
               </div>
             )}
             <div className="flex justify-between gap-4">
@@ -142,6 +151,16 @@ export function PaymentPromptModal({
               <span className="text-right font-medium">{accountName}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Call before you pay</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            Make sure you call {parentName}
+            {parentPhone ? ` on ${parentPhone}` : ""} before sending money. If they
+            are not picking up, use <strong>Reassign</strong> below and the system
+            will merge you to another member with an open slot.
+          </p>
         </div>
 
         <div className="mt-5 rounded-xl border border-dashed border-orange-300 bg-orange-50/40 p-4">
@@ -203,11 +222,22 @@ export function PaymentPromptModal({
         <button
           type="button"
           onClick={() => file && onClaim(contributionId, file)}
-          disabled={claiming || !file}
+          disabled={claiming || reassigning || !file}
           className="mt-5 w-full rounded-xl bg-orange-600 py-3.5 font-semibold text-white transition hover:bg-orange-700 disabled:opacity-60"
         >
           {claiming ? "Uploading..." : "Upload & Submit Payment"}
         </button>
+
+        {onReassign && (
+          <button
+            type="button"
+            onClick={onReassign}
+            disabled={claiming || reassigning}
+            className="mt-3 w-full rounded-xl border border-slate-300 bg-white py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            {reassigning ? "Reassigning..." : "Reassign to another member"}
+          </button>
+        )}
 
         <p className="mt-3 text-center text-xs text-orange-600/70">
           The recipient must confirm within 24 hours after you submit.

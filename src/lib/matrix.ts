@@ -41,6 +41,7 @@ import {
   hasConfirmedPaymentForCycle,
   syncPaidStateForCurrentCycle,
   canAssignNewPayment,
+  uplineMatrixReadyForPayout,
 } from "@/lib/cycle-payment";
 import {
   recordPayoutTransaction,
@@ -282,6 +283,9 @@ export async function tryAssignMemberToPaymentSlot(
   }
 
   if (member.hasPaidContribution && member.status === "active") {
+    if (!(await uplineMatrixReadyForPayout(member))) {
+      return { assigned: false, waiting: true, rematchAfter: null };
+    }
     return { assigned: true, newParent: null };
   }
 
@@ -317,6 +321,8 @@ export const tryAssignMemberToEligibleSlot = tryAssignMemberToPaymentSlot;
 export const scheduleRematchWait = queueForMerge;
 
 async function restartCycle(member: Member) {
+  if (!(await uplineMatrixReadyForPayout(member))) return;
+
   const subtreeIds = await getSubtreeIds(member);
   const formerChildIds: string[] = [];
   if (member.leftChildId) formerChildIds.push(member.leftChildId);
@@ -374,14 +380,8 @@ async function restartCycle(member: Member) {
 
 async function checkAndCompleteCycle(uplineId: string) {
   const upline = await findMemberById(uplineId);
-  if (!upline?.leftChildId || !upline.rightChildId) return;
-
-  const [left, right] = await Promise.all([
-    findMemberById(upline.leftChildId),
-    findMemberById(upline.rightChildId),
-  ]);
-
-  if (!left?.hasPaidContribution || !right?.hasPaidContribution) return;
+  if (!upline) return;
+  if (!(await uplineMatrixReadyForPayout(upline))) return;
   await restartCycle(upline);
 }
 
@@ -569,11 +569,7 @@ export async function repairStuckAfterMatrixComplete() {
 
   const readyForRestart = await findReadyForCycleRestart();
   for (const member of readyForRestart) {
-    const [left, right] = await Promise.all([
-      findMemberById(member.leftChildId!),
-      findMemberById(member.rightChildId!),
-    ]);
-    if (left?.hasPaidContribution && right?.hasPaidContribution) {
+    if (await uplineMatrixReadyForPayout(member)) {
       await restartCycle(member);
     }
   }
@@ -613,11 +609,7 @@ export async function repairStuckAfterMatrixComplete() {
 async function completeReadyCycles() {
   const ready = await findReadyForCycleRestart();
   for (const member of ready) {
-    const [left, right] = await Promise.all([
-      findMemberById(member.leftChildId!),
-      findMemberById(member.rightChildId!),
-    ]);
-    if (left?.hasPaidContribution && right?.hasPaidContribution) {
+    if (await uplineMatrixReadyForPayout(member)) {
       await restartCycle(member);
     }
   }
@@ -852,6 +844,73 @@ export async function rematchMemberAfterRejection(payerId: string) {
   }
 
   return { payer, newParent: result.newParent, waiting: false };
+}
+
+/** Payer-initiated: merge to another member with an open payment slot. */
+export async function requestMemberPayeeReassign(payerId: string) {
+  const payer = await findMemberById(payerId);
+  if (!payer) throw new Error("Member not found");
+  if (payer.isSuspended) {
+    throw new Error("Your account has been suspended. Please contact support.");
+  }
+  if (payer.hasPaidContribution && payer.status === "active") {
+    throw new Error("You have already activated your account");
+  }
+  if (!payer.parentId) {
+    throw new Error("You are not assigned to a payee yet");
+  }
+
+  const activeOutgoing = await findOneContribution({
+    fromMemberId: payer.id,
+    status: ["pending", "awaiting_confirmation"],
+  });
+
+  if (activeOutgoing?.status === "awaiting_confirmation") {
+    throw new Error(
+      "You already submitted payment for confirmation. Wait for approval or contact support."
+    );
+  }
+
+  await clearPendingOutgoing(payer.id);
+
+  const oldParent = await findMemberById(payer.parentId);
+  const rematch = await rematchMemberAfterRejection(payer.id);
+
+  if (rematch.waiting) {
+    return {
+      rematched: false,
+      waiting: true,
+      rematchAfter: rematch.rematchAfter,
+      message:
+        "No open slot right now. The system will match you to another member shortly.",
+    };
+  }
+
+  if (!rematch.newParent) {
+    return {
+      rematched: false,
+      waiting: false,
+      message: "Could not find another member with an open slot. Please try again.",
+    };
+  }
+
+  const parent = rematch.newParent;
+  return {
+    rematched: true,
+    waiting: false,
+    newParent: {
+      memberId: parent.memberId,
+      fullName: parent.fullName,
+      phone: parent.phone,
+      bankName: parent.bankName,
+      accountNumber: parent.accountNumber,
+      accountName: parent.accountName,
+    },
+    previousPayee: oldParent
+      ? { memberId: oldParent.memberId, fullName: oldParent.fullName }
+      : null,
+    message: `You have been reassigned to ${parent.fullName} (${parent.memberId}). Call them before you pay.`,
+  };
 }
 
 export const confirmContribution = async (contributionId: string) => {

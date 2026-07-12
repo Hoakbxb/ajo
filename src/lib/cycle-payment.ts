@@ -188,3 +188,30 @@ export async function canAssignNewPayment(member: Member): Promise<boolean> {
   const cycleNumber = getCurrentCycleNumber(member);
   return !(await hasConfirmedPaymentForCycle(member, cycleNumber));
 }
+
+/** Both matrix slots filled with downlines who confirmed payment to this upline. */
+export async function uplineMatrixReadyForPayout(upline: Member): Promise<boolean> {
+  if (!upline.leftChildId || !upline.rightChildId) return false;
+
+  const [left, right] = await Promise.all([
+    findMemberById(upline.leftChildId),
+    findMemberById(upline.rightChildId),
+  ]);
+  if (!left || !right) return false;
+  if (left.parentId !== upline.id || right.parentId !== upline.id) return false;
+
+  const [leftPaid, rightPaid] = await Promise.all([
+    findOneContribution({
+      fromMemberId: left.id,
+      toMemberId: upline.id,
+      status: "confirmed",
+    }),
+    findOneContribution({
+      fromMemberId: right.id,
+      toMemberId: upline.id,
+      status: "confirmed",
+    }),
+  ]);
+
+  return !!leftPaid && !!rightPaid;
+}

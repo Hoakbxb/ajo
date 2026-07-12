@@ -280,6 +280,33 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
     }
   }
 
+  async function reassignPayee() {
+    if (
+      !window.confirm(
+        "Reassign you to another member with an open slot? Your current payee assignment will be released."
+      )
+    ) {
+      return;
+    }
+
+    setActing("reassign");
+    setActionMessage(null);
+    try {
+      const res = await fetch("/api/members/reassign-payee", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setActionMessage(json.error || "Failed to reassign");
+        return;
+      }
+      setActionMessage(json.message || "Payee reassigned");
+      setModalDismissed(false);
+      setShowPaymentModal(true);
+      await fetchData();
+    } finally {
+      setActing(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24">
@@ -363,6 +390,8 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
           contributionId={pendingContribution._id}
           onClaim={claimPayment}
           claiming={acting === pendingContribution._id}
+          onReassign={reassignPayee}
+          reassigning={acting === "reassign"}
           onClose={closePaymentModal}
         />
       )}

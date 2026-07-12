@@ -28,9 +28,12 @@ function PayerDetails({
       {payer.phone && (
         <div className="flex justify-between gap-4">
           <span className={metaClassName}>Phone</span>
-          <span className={`font-mono font-medium ${nameClassName}`}>
+          <a
+            href={`tel:${payer.phone}`}
+            className={`font-mono font-medium underline-offset-2 hover:underline ${nameClassName}`}
+          >
             {payer.phone}
-          </span>
+          </a>
         </div>
       )}
     </div>
@@ -106,6 +109,15 @@ export function IncomingContributionModal({
             ? "A member says they sent you money. Approve or reject within 24 hours."
             : "These members are assigned to pay you. Approve once you receive payment, or reject to release the slot."}
         </p>
+
+        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p className="font-medium">Call the member first</p>
+          <p className="mt-1 text-xs leading-relaxed text-blue-800">
+            Make sure you call them on the phone number shown before approving. If
+            they are not picking up and have not paid, reject the payment so the
+            system can reassign them to another member with an open slot.
+          </p>
+        </div>
 
         <div className="mt-5 space-y-4">
           {awaiting.map((c) => (
