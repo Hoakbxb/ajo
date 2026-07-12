@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       accountNumber: normalizedAccountNumber,
       accountName: accountName.trim(),
       authUserId: authUser.id,
+      password,
     });
 
     await signInWithEmailPassword(normalizedEmail, password);

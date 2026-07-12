@@ -116,6 +116,20 @@ export async function PATCH(request: Request) {
       await updateAuthUser(member.authUserId, { password: newPassword });
     }
 
+    const memberPatch: Parameters<typeof updateMember>[1] = {
+      fullName: fullName.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      bankCode: bank.code,
+      bankName: bank.name,
+      accountNumber: normalizedAccountNumber,
+      accountName: accountName.trim(),
+    };
+
+    if (newPassword !== undefined && newPassword !== "") {
+      memberPatch.password = newPassword;
+    }
+
     const [emailTaken, phoneTaken] = await Promise.all([
       findMemberByEmail(normalizedEmail),
       findMemberByPhone(normalizedPhone),
@@ -153,15 +167,7 @@ export async function PATCH(request: Request) {
       await updateAuthUser(member.authUserId, authPatch);
     }
 
-    const updated = await updateMember(member.id, {
-      fullName: fullName.trim(),
-      email: normalizedEmail,
-      phone: normalizedPhone,
-      bankCode: bank.code,
-      bankName: bank.name,
-      accountNumber: normalizedAccountNumber,
-      accountName: accountName.trim(),
-    });
+    const updated = await updateMember(member.id, memberPatch);
 
     return NextResponse.json({
       message: "Profile updated successfully",

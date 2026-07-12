@@ -281,6 +281,7 @@ export default function AdminMembersContent({
         { key: "fullName", label: "Name" },
         { key: "email", label: "Email" },
         { key: "phone", label: "Phone" },
+        { key: "password", label: "Password" },
         { key: "status", label: "Status" },
         { key: "role", label: "Role" },
         { key: "cyclesCompleted", label: "Cycles" },
@@ -505,6 +506,7 @@ export default function AdminMembersContent({
                     <th className="w-10 px-4 py-3" />
                     <th className="px-4 py-3">Member</th>
                     <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3">Password</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Match / pay</th>
                     <th className="px-4 py-3">Cycles</th>
@@ -540,6 +542,11 @@ export default function AdminMembersContent({
                       <td className="px-4 py-3.5 text-sm text-slate-600">
                         <p>{member.phone}</p>
                         <p className="text-xs text-slate-400">{member.email}</p>
+                      </td>
+                      <td className="px-4 py-3.5 font-mono text-sm text-slate-600">
+                        {member.password ?? (
+                          <span className="font-sans text-xs text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex flex-wrap gap-1.5">

@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { SITE_NAME } from "@/lib/brand";
 
 const APP_ROUTES = ["/dashboard", "/profile", "/transactions", "/admin"];
-const AUTH_ROUTES = ["/", "/join"];
+const AUTH_ROUTES = ["/", "/join", "/forgot-password", "/reset-password"];
 
 function isAppRoute(pathname: string) {
   return APP_ROUTES.some(

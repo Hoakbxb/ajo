@@ -35,6 +35,7 @@ export interface AdminMemberListItem {
   fullName: string;
   email: string;
   phone: string;
+  password?: string | null;
   status: string;
   role: string;
   hasPaidContribution: boolean;

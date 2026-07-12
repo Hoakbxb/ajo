@@ -24,6 +24,7 @@ export function toMember(row: MemberRow): Member {
     bankName: row.bank_name,
     accountNumber: row.account_number,
     accountName: row.account_name,
+    password: row.password,
     authUserId: row.auth_user_id,
     parentId: row.parent_id,
     leftChildId: row.left_child_id,
@@ -100,6 +101,7 @@ export function memberPatchToRow(
   if (patch.bankName !== undefined) row.bank_name = patch.bankName;
   if (patch.accountNumber !== undefined) row.account_number = patch.accountNumber;
   if (patch.accountName !== undefined) row.account_name = patch.accountName;
+  if (patch.password !== undefined) row.password = patch.password;
   if (patch.authUserId !== undefined) row.auth_user_id = patch.authUserId;
   if (patch.parentId !== undefined) row.parent_id = patch.parentId;
   if (patch.leftChildId !== undefined) row.left_child_id = patch.leftChildId;
@@ -130,6 +132,13 @@ export function memberPatchToRow(
   if (patch.rematchAfter !== undefined)
     row.rematch_after = patch.rematchAfter?.toISOString() ?? null;
   return row;
+}
+
+export function omitMemberPassword<T extends { password?: string | null }>(
+  member: T
+): Omit<T, "password"> {
+  const { password: _, ...safeMember } = member;
+  return safeMember;
 }
 
 export function contributionPatchToRow(

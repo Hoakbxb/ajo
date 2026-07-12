@@ -93,7 +93,7 @@ export function IncomingContributionModal({
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           {awaiting.length > 0
-            ? "A member says they sent you money. Approve or reject within 30 minutes."
+            ? "A member says they sent you money. Approve or reject within 24 hours."
             : "These members are assigned to pay you. Approve once you receive payment, or reject to release the slot."}
         </p>
 

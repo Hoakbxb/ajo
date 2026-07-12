@@ -20,6 +20,8 @@ import type {
   PlatformSettingsRow,
   AdminActivityLog,
   AdminActivityLogRow,
+  PasswordResetToken,
+  PasswordResetTokenRow,
 } from "@/types/database";
 
 const MEMBERS = "members";
@@ -212,6 +214,7 @@ export async function createMember(
       bank_name: input.bankName,
       account_number: input.accountNumber,
       account_name: input.accountName,
+      password: input.password ?? null,
       auth_user_id: input.authUserId,
       parent_id: input.parentId,
       left_child_id: input.leftChildId,
@@ -749,4 +752,63 @@ export async function findAdminActivityLogs(limit = 100): Promise<AdminActivityL
     details: row.details ?? {},
     createdAt: new Date(row.created_at),
   }));
+}
+
+// ─── Password reset tokens ───────────────────────────────────────────────────
+
+const PASSWORD_RESET_TOKENS = "password_reset_tokens";
+
+function toPasswordResetToken(row: PasswordResetTokenRow): PasswordResetToken {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    tokenHash: row.token_hash,
+    expiresAt: new Date(row.expires_at),
+    usedAt: row.used_at ? new Date(row.used_at) : null,
+    createdAt: new Date(row.created_at),
+  };
+}
+
+export async function createPasswordResetToken(input: {
+  memberId: string;
+  tokenHash: string;
+  expiresAt: Date;
+}): Promise<PasswordResetToken> {
+  await getSupabaseAdmin()
+    .from(PASSWORD_RESET_TOKENS)
+    .delete()
+    .eq("member_id", input.memberId)
+    .is("used_at", null);
+
+  const { data, error } = await getSupabaseAdmin()
+    .from(PASSWORD_RESET_TOKENS)
+    .insert({
+      member_id: input.memberId,
+      token_hash: input.tokenHash,
+      expires_at: input.expiresAt.toISOString(),
+    })
+    .select("*")
+    .single();
+  throwIfError(error, "createPasswordResetToken");
+  return toPasswordResetToken(data as PasswordResetTokenRow);
+}
+
+export async function findPasswordResetTokenByHash(
+  tokenHash: string
+): Promise<PasswordResetToken | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(PASSWORD_RESET_TOKENS)
+    .select("*")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+  throwIfError(error, "findPasswordResetTokenByHash");
+  return data ? toPasswordResetToken(data as PasswordResetTokenRow) : null;
+}
+
+export async function markPasswordResetTokenUsed(id: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from(PASSWORD_RESET_TOKENS)
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", id);
+  throwIfError(error, "markPasswordResetTokenUsed");
 }

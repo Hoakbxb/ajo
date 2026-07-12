@@ -336,7 +336,7 @@ export function IncomingPaymentAlert({
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-slate-900">Incoming payment — action required</h3>
-            <p className="mt-0.5 text-sm text-slate-500">Review and approve within 30 minutes</p>
+            <p className="mt-0.5 text-sm text-slate-500">Review and approve within 24 hours</p>
           </div>
         </div>
         <div className="mt-4 space-y-2">

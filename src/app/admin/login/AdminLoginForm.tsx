@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -53,7 +54,7 @@ export default function AdminLoginForm() {
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
           className={inputClass}
-          placeholder="admin@friendsrewardcircle.com"
+          placeholder="admin@wealthcircle.info"
         />
       </div>
 
@@ -70,6 +71,14 @@ export default function AdminLoginForm() {
           className={inputClass}
           placeholder="Enter admin password"
         />
+        <p className="mt-2 text-right">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </p>
       </div>
 
       <button

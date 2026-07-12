@@ -4,6 +4,7 @@ import {
   findMemberById,
 } from "@/lib/db/repository";
 import { populateContributions, populateMemberRef } from "@/lib/db/populate";
+import { omitMemberPassword } from "@/lib/db/mappers";
 import { enrichContributionsWithProofUrls } from "@/lib/payment-proof";
 import { PAYOUT_AMOUNT } from "@/lib/constants";
 import { maintainMatrixState, getCurrentCycleNumber } from "@/lib/matrix";
@@ -117,7 +118,7 @@ export async function GET(
 
     return NextResponse.json({
       member: {
-        ...member,
+        ...omitMemberPassword(member),
         parentId: parent,
       },
       children: {

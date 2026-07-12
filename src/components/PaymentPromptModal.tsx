@@ -199,7 +199,7 @@ export function PaymentPromptModal({
         </button>
 
         <p className="mt-3 text-center text-xs text-orange-600/70">
-          The recipient must confirm within 30 minutes after you submit.
+          The recipient must confirm within 24 hours after you submit.
         </p>
       </div>
     </div>

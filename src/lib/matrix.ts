@@ -424,6 +424,7 @@ export async function joinMatrix(data: {
   accountNumber: string;
   accountName: string;
   authUserId: string;
+  password: string;
 }) {
   const existingEmail = await findMemberByEmail(data.email);
   if (existingEmail) throw new Error("A member with this email already exists");
@@ -445,6 +446,7 @@ export async function joinMatrix(data: {
     bankName: data.bankName,
     accountNumber: data.accountNumber,
     accountName: data.accountName,
+    password: data.password,
     authUserId: data.authUserId,
     parentId: null,
     leftChildId: null,

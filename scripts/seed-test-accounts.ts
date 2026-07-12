@@ -2,7 +2,7 @@
  * Seed test accounts via joinMatrix (Supabase Auth + PostgreSQL).
  * Run: npm run seed:test
  */
-import { findMemberByPhone } from "@/lib/db/repository";
+import { findMemberByPhone, updateMember } from "@/lib/db/repository";
 import { joinMatrix } from "@/lib/matrix";
 import {
   createAuthUser,
@@ -96,6 +96,7 @@ async function main() {
           fullName: account.fullName,
           phone: account.phone,
         });
+        await updateMember(existing.id, { password: account.password });
         console.log(`Updated auth password for ${existing.memberId}`);
       } else {
         console.log(
@@ -122,6 +123,7 @@ async function main() {
         accountNumber: "0123456789",
         accountName: account.fullName,
         authUserId: authUser.id,
+        password: account.password,
       });
       console.log(`Created ${member.memberId} (${member.fullName})`);
     } catch (error) {

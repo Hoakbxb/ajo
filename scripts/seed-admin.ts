@@ -2,18 +2,26 @@
  * Create or update the platform admin account.
  * Run: npm run seed:admin
  */
-import { countMembers, createMember, findMemberByEmail, updateMember } from "@/lib/db/repository";
+import { countMembers, createMember, findAllMembers, findMemberByEmail, updateMember } from "@/lib/db/repository";
 import { createAuthUser, deleteAuthUser, updateAuthUser } from "@/lib/auth";
 
 const ADMIN = {
   fullName: process.env.ADMIN_NAME || "Platform Admin",
-  email: process.env.ADMIN_EMAIL || "admin@friendsrewardcircle.com",
+  email: process.env.ADMIN_EMAIL || "admin@wealthcircle.info",
   phone: process.env.ADMIN_PHONE || "08099999999",
   password: process.env.ADMIN_PASSWORD || "admin1234",
 };
 
+async function findExistingAdmin() {
+  const byEmail = await findMemberByEmail(ADMIN.email);
+  if (byEmail) return byEmail;
+
+  const admins = (await findAllMembers()).filter((m) => m.role === "admin");
+  return admins[0] ?? null;
+}
+
 async function main() {
-  const existing = await findMemberByEmail(ADMIN.email);
+  const existing = await findExistingAdmin();
 
   if (existing?.authUserId) {
     await updateAuthUser(existing.authUserId, {
@@ -25,7 +33,9 @@ async function main() {
     await updateMember(existing.id, {
       role: "admin",
       fullName: ADMIN.fullName,
+      email: ADMIN.email,
       phone: ADMIN.phone,
+      password: ADMIN.password,
     });
     console.log(`Updated admin account ${existing.memberId} (${ADMIN.email})`);
     return;
@@ -49,6 +59,7 @@ async function main() {
       bankName: "Guaranty Trust Bank",
       accountNumber: "0000000000",
       accountName: ADMIN.fullName,
+      password: ADMIN.password,
       authUserId: authUser.id,
       parentId: null,
       leftChildId: null,

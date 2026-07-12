@@ -20,6 +20,7 @@ export interface MemberRow {
   bank_name: string;
   account_number: string;
   account_name: string;
+  password: string | null;
   auth_user_id: string | null;
   parent_id: string | null;
   left_child_id: string | null;
@@ -89,6 +90,7 @@ export interface Member {
   bankName: string;
   accountNumber: string;
   accountName: string;
+  password?: string | null;
   authUserId?: string | null;
   parentId: string | null;
   leftChildId: string | null;
@@ -185,4 +187,22 @@ export interface AdminActivityLog {
   details: Record<string, unknown>;
   createdAt: Date;
   adminName?: string;
+}
+
+export interface PasswordResetTokenRow {
+  id: string;
+  member_id: string;
+  token_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+}
+
+export interface PasswordResetToken {
+  id: string;
+  memberId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  createdAt: Date;
 }

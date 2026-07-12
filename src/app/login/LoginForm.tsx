@@ -72,6 +72,14 @@ export default function LoginForm() {
           className={authInputClass}
           placeholder="Enter your password"
         />
+        <p className="mt-2 text-right">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </p>
       </AuthField>
 
       <button
