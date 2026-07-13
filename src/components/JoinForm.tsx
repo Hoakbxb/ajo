@@ -68,7 +68,11 @@ function validateStep(step: number, form: FormState): string | null {
   return null;
 }
 
-export default function JoinForm() {
+export default function JoinForm({
+  referralCode,
+}: {
+  referralCode?: string;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -107,7 +111,10 @@ export default function JoinForm() {
       const res = await fetch("/api/members/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          referralCode: referralCode?.trim() || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -127,6 +134,11 @@ export default function JoinForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <StepIndicator steps={STEPS} currentStep={step} />
+      {referralCode && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+          Referred by <span className="font-semibold">{referralCode}</span>
+        </div>
+      )}
       <AuthError message={error} />
 
       {step === 0 && (

@@ -19,6 +19,7 @@ import {
   YourPaymentCard,
   IncomingContributionsCard,
   RecentActivityCard,
+  ReferralLinkCard,
 } from "./DashboardCards";
 import { DashboardHeader, DashboardStats } from "./DashboardStats";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
@@ -324,7 +325,7 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
     );
   }
 
-  const { member, contributions, matrixProgress, paymentStatus } = data;
+  const { member, contributions, matrixProgress, paymentStatus, referrals } = data;
 
   const notificationCount = contributions.incoming.filter(
     (c) => c.status === "awaiting_confirmation"
@@ -424,6 +425,8 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
       />
 
       <DashboardStats data={data} />
+
+      <ReferralLinkCard referrals={referrals} />
 
       <ProfileCard member={member} paymentStatus={paymentStatus} />
 

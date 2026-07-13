@@ -5,6 +5,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CreditCard,
+  Gift,
   Star,
   TrendingUp,
   Wallet,
@@ -35,13 +36,23 @@ const filters: { id: Filter; label: string }[] = [
   { id: "sent", label: "Sent" },
   { id: "received", label: "Received" },
   { id: "payout", label: "Rewards" },
+  { id: "referral", label: "Referrals" },
 ];
 
-const kindConfig = {
-  sent: { icon: ArrowUpRight, accent: "blue" as const },
-  received: { icon: ArrowDownLeft, accent: "emerald" as const },
-  payout: { icon: Star, accent: "violet" as const },
+const kindConfig: Record<
+  TransactionKind,
+  { icon: typeof ArrowUpRight; accent: "blue" | "emerald" | "violet" | "amber" | "indigo" }
+> = {
+  sent: { icon: ArrowUpRight, accent: "blue" },
+  received: { icon: ArrowDownLeft, accent: "emerald" },
+  payout: { icon: Star, accent: "violet" },
+  referral: { icon: Gift, accent: "amber" },
+  referral_credit: { icon: Wallet, accent: "indigo" },
 };
+
+function isCreditKind(kind: TransactionKind) {
+  return kind === "received" || kind === "payout" || kind === "referral";
+}
 
 function TransactionRowMobile({
   transaction,
@@ -51,8 +62,7 @@ function TransactionRowMobile({
   const config = kindConfig[transaction.kind];
   const Icon = config.icon;
   const styles = accentStyles[config.accent];
-  const isCredit =
-    transaction.kind === "received" || transaction.kind === "payout";
+  const isCredit = isCreditKind(transaction.kind);
   const amountPrefix = isCredit ? "+" : "−";
 
   return (
@@ -70,7 +80,9 @@ function TransactionRowMobile({
             </p>
             {transaction.counterparty && (
               <p className="mt-0.5 truncate text-xs text-slate-500">
-                {transaction.kind === "sent" ? "To" : "From"}{" "}
+                {transaction.kind === "sent" || transaction.kind === "referral_credit"
+                  ? "To"
+                  : "From"}{" "}
                 {transaction.counterparty}
               </p>
             )}
@@ -107,8 +119,7 @@ function TransactionRowDesktop({
   const config = kindConfig[transaction.kind];
   const Icon = config.icon;
   const styles = accentStyles[config.accent];
-  const isCredit =
-    transaction.kind === "received" || transaction.kind === "payout";
+  const isCredit = isCreditKind(transaction.kind);
   const amountPrefix = isCredit ? "+" : "−";
 
   return (
@@ -199,8 +210,8 @@ export default function TransactionsContent({
         <ProStatCard
           accent="violet"
           label="Rewards Earned"
-          value={formatNaira(summary.payoutTotal)}
-          sublabel="Completed cycles"
+          value={formatNaira(summary.payoutTotal + summary.referralTotal)}
+          sublabel="Cycles & referrals"
           icon={TrendingUp}
         />
       </div>

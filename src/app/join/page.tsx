@@ -2,11 +2,21 @@ import JoinForm from "@/components/JoinForm";
 import { AuthLink, AuthShell } from "@/components/auth/auth-ui";
 import { SITE_NAME } from "@/lib/brand";
 
-export default function JoinPage() {
+export default async function JoinPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>;
+}) {
+  const { ref } = await searchParams;
+
   return (
     <AuthShell
       title="Create your account"
-      description="Register in a few steps to join the next available matrix position."
+      description={
+        ref
+          ? "You've been invited to join. Complete registration to get started."
+          : "Register in a few steps to join the next available matrix position."
+      }
       aside={
         <>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -27,7 +37,7 @@ export default function JoinPage() {
         </p>
       }
     >
-      <JoinForm />
+      <JoinForm referralCode={ref} />
     </AuthShell>
   );
 }

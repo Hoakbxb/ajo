@@ -14,3 +14,5 @@ export const SITE_URL =
   process.env.SITE_URL ||
   "https://www.wealthcircle.info";
 export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+export const REFERRAL_REWARD_AMOUNT = 1000;
+export const REFERRAL_WITHDRAWAL_THRESHOLD = 5000;

@@ -32,6 +32,7 @@ import {
   REMATCH_WAIT_TIMEOUT_MS,
 } from "@/lib/constants";
 import { normalizePhone } from "@/lib/phone";
+import { sendMergeNotificationSms } from "@/lib/sms";
 import { isActiveStatus, canReceiveMemberPayments } from "@/lib/member-status";
 import { migrateMemberStatuses } from "@/lib/member-status-migrate";
 import {
@@ -55,6 +56,7 @@ import {
   syncContributionTransactions,
 } from "@/lib/transaction-ledger";
 import { getPayoutAmount } from "@/lib/platform-settings";
+import { qualifyReferralForPayer } from "@/lib/referrals";
 
 export { getCurrentCycleNumber } from "@/lib/cycle-payment";
 
@@ -280,6 +282,15 @@ async function mergeToSlot(member: Member, slot: Slot) {
   await updateMember(slot.parent.id, { [childField]: payer.id });
 
   await createOutgoingContributionForCycle(payer, slot.parent.id);
+
+  void sendMergeNotificationSms(
+    { phone: payer.phone, fullName: payer.fullName },
+    { phone: slot.parent.phone, fullName: slot.parent.fullName }
+  ).catch((error: unknown) => {
+    const message =
+      error instanceof Error ? error.message : "Failed to send merge SMS";
+    console.error("[merge-sms]", message);
+  });
 }
 
 async function queueForMerge(member: Member): Promise<Date> {
@@ -466,6 +477,7 @@ export async function joinMatrix(data: {
   accountName: string;
   authUserId: string;
   password: string;
+  referralCode?: string;
 }) {
   const existingEmail = await findMemberByEmail(data.email);
   if (existingEmail) throw new Error("A member with this email already exists");
@@ -477,6 +489,15 @@ export async function joinMatrix(data: {
   }
 
   const memberId = await generateMemberId();
+
+  let referrer: Member | null = null;
+  if (data.referralCode?.trim()) {
+    const { resolveReferrer } = await import("@/lib/referrals");
+    referrer = await resolveReferrer(data.referralCode);
+    if (!referrer) {
+      throw new Error("Invalid referral code");
+    }
+  }
 
   const member = await createMember({
     memberId,
@@ -503,7 +524,15 @@ export async function joinMatrix(data: {
     paymentRejectionCount: 0,
     requiresAdminContact: false,
     isSuspended: false,
+    referredByMemberId: referrer?.id ?? null,
+    referralBalance: 0,
+    contributionCredit: 0,
   });
+
+  if (referrer) {
+    const { registerReferral } = await import("@/lib/referrals");
+    await registerReferral(referrer, member);
+  }
 
   try {
     const result = await tryAssignMemberToPaymentSlot(member, [], {
@@ -700,6 +729,36 @@ export async function maintainMatrixState() {
   await expireTimedOutClaims();
 }
 
+/** Lightweight per-member sync for dashboard reads — avoids full-matrix maintenance. */
+export async function syncMemberDashboardState(memberId: string): Promise<void> {
+  let member = await findMemberById(memberId);
+  if (!member || member.isSuspended) return;
+
+  await syncPaidStateForCurrentCycle(member);
+
+  member = (await findMemberById(memberId)) ?? member;
+  if (member.hasPaidContribution && member.status === "active") return;
+
+  const needsMerge =
+    member.status === "pending" &&
+    !member.hasPaidContribution &&
+    !member.parentId &&
+    (!member.rematchAfter || member.rematchAfter <= new Date());
+
+  if (!needsMerge) return;
+
+  const activeOutgoing = await findOneContribution({
+    fromMemberId: member.id,
+    status: ["pending", "awaiting_confirmation"],
+  });
+  if (activeOutgoing) return;
+
+  await tryAssignMemberToPaymentSlot(member, [], {
+    allowBeforeMatrixComplete: true,
+    scheduleWaitOnNoSlot: true,
+  });
+}
+
 export async function expireStaleContributions() {
   await maintainMatrixState();
 }
@@ -795,6 +854,74 @@ export async function approveContribution(
 
   await clearPendingOutgoing(payer.id);
   await syncContributionTransactionStatus(confirmed);
+  await qualifyReferralForPayer({ ...payer, hasPaidContribution: true, status: "active" });
+  await checkAndCompleteCycle(contribution.toMemberId);
+  await processPendingMerges();
+
+  return confirmed;
+}
+
+/** Confirm a contribution using referral credit instead of a bank transfer. */
+export async function approveContributionWithCredit(
+  contributionId: string,
+  payerMemberId: string,
+  creditAmount: number
+) {
+  await expireStaleContributions();
+
+  const contribution = await findContributionById(contributionId);
+  if (!contribution) throw new Error("Contribution not found");
+  if (contribution.fromMemberId !== payerMemberId) {
+    throw new Error("You can only use credit on your own contribution");
+  }
+  if (contribution.status === "confirmed") {
+    throw new Error("Contribution already confirmed");
+  }
+
+  const payer = await findMemberById(contribution.fromMemberId);
+  if (!payer) throw new Error("Member not found");
+
+  const availableCredit = payer.contributionCredit ?? 0;
+  if (availableCredit < creditAmount) {
+    throw new Error("Insufficient referral credit");
+  }
+
+  const cycleNumber = getCurrentCycleNumber(payer);
+  if (contribution.cycleNumber !== cycleNumber) {
+    throw new Error("This payment is not for the payer's current cycle");
+  }
+  if (await hasConfirmedPaymentForCycle(payer, cycleNumber)) {
+    throw new Error("This member has already paid for the current cycle");
+  }
+
+  const confirmed = await updateContribution(contribution.id, {
+    status: "confirmed",
+    confirmedAt: new Date(),
+  });
+
+  await updateMember(payer.id, {
+    hasPaidContribution: true,
+    status: "active",
+    contributionCredit: availableCredit - creditAmount,
+  });
+
+  const { upsertReferralTransaction } = await import("@/lib/db/repository");
+  const recipient = await findMemberById(contribution.toMemberId);
+
+  await upsertReferralTransaction({
+    memberId: payer.id,
+    amount: creditAmount,
+    kind: "referral_credit",
+    counterpartyMemberId: contribution.toMemberId,
+    counterpartyName: recipient?.fullName ?? null,
+    contributionId: contribution.id,
+    reference: `referral-credit-${contribution.id}`,
+    occurredAt: new Date(),
+  });
+
+  await clearPendingOutgoing(payer.id);
+  await syncContributionTransactionStatus(confirmed);
+  await qualifyReferralForPayer({ ...payer, hasPaidContribution: true, status: "active" });
   await checkAndCompleteCycle(contribution.toMemberId);
   await processPendingMerges();
 

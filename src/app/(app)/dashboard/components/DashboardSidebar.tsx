@@ -19,7 +19,7 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
   { href: "/transactions", label: "Transactions", icon: CreditCard },
   { href: "/profile", label: "Profile", icon: User },
-  { href: "#", label: "Wallet", icon: Wallet, disabled: true },
+  { href: "/wallet", label: "Referrals", icon: Wallet },
   { href: "#", label: "Settings", icon: Settings, disabled: true },
   { href: "#", label: "Support", icon: CircleHelp, disabled: true },
 ];

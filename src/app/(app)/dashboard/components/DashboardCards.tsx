@@ -1,18 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   CreditCard,
   Gift,
   Mail,
   Network,
   Phone,
   RefreshCw,
+  Share2,
   Star,
   User,
   Users,
@@ -607,6 +611,111 @@ export function RecentActivityCard({ data }: { data: MemberDashboardData }) {
           })}
         </div>
       )}
+    </ProCard>
+  );
+}
+
+export function ReferralLinkCard({
+  referrals,
+}: {
+  referrals: MemberDashboardData["referrals"];
+}) {
+  const [copied, setCopied] = useState(false);
+  const progressPercent = Math.min(
+    100,
+    Math.round((referrals.balance / referrals.withdrawalThreshold) * 100)
+  );
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(referrals.referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <ProCard
+      accent="indigo"
+      title="Invite friends"
+      description={`Earn ${formatNaira(referrals.rewardPerReferral)} per referral`}
+      icon={Share2}
+      action={
+        <Link
+          href="/wallet"
+          className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+        >
+          View wallet
+        </Link>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="rounded-lg bg-indigo-50 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500">
+              Your code
+            </p>
+            <p className="text-sm font-bold text-indigo-900">
+              {referrals.referralCode}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <Gift className="h-4 w-4 text-emerald-600" strokeWidth={2} />
+            <span>
+              Balance:{" "}
+              <span className="font-semibold text-slate-900">
+                {formatNaira(referrals.balance)}
+              </span>
+            </span>
+            <span className="hidden text-slate-300 sm:inline">·</span>
+            <Users className="h-4 w-4 text-violet-600" strokeWidth={2} />
+            <span>{referrals.qualifiedCount} earned</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            readOnly
+            value={referrals.referralLink}
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+          />
+          <ProButton
+            type="button"
+            variant="secondary"
+            onClick={copyLink}
+            className="shrink-0"
+          >
+            {copied ? (
+              <>
+                <Check className="h-4 w-4" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy link
+              </>
+            )}
+          </ProButton>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              Progress to {formatNaira(referrals.withdrawalThreshold)} redemption
+            </span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-indigo-500 transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
     </ProCard>
   );
 }

@@ -7,60 +7,100 @@ import { populateContributions, populateMemberRef } from "@/lib/db/populate";
 import { omitMemberPassword } from "@/lib/db/mappers";
 import { enrichContributionsWithProofUrls } from "@/lib/payment-proof";
 import { PAYOUT_AMOUNT } from "@/lib/constants";
-import { maintainMatrixState, getCurrentCycleNumber } from "@/lib/matrix";
+import { syncMemberDashboardState, getCurrentCycleNumber } from "@/lib/matrix";
 import {
   computeContributionOwed,
   memberOwesPaymentForCurrentCycle,
 } from "@/lib/cycle-payment";
 import { getPaymentStatus } from "@/lib/payment-status";
 import { getContributionAmount } from "@/lib/platform-settings";
+import { getReferralDashboardSummary } from "@/lib/referrals";
+
+const INCOMING_PROOF_STATUSES = new Set([
+  "pending",
+  "awaiting_confirmation",
+]);
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await maintainMatrixState();
-
     const { id } = await params;
 
-    let member = await findMemberById(id);
+    await syncMemberDashboardState(id);
+
+    const member = await findMemberById(id);
     if (!member) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    member = (await findMemberById(id))!;
-    const parent = await populateMemberRef(member.parentId, [
-      "memberId",
-      "fullName",
-      "email",
-      "phone",
-      "bankName",
-      "bankCode",
-      "accountNumber",
-      "accountName",
-    ]);
-
     const currentCycle = getCurrentCycleNumber(member);
 
-    const [allOutgoingRaw, incomingRaw, leftChild, rightChild] =
-      await Promise.all([
-        findContributions({ fromMemberId: member.id }),
-        findContributions({ toMemberId: member.id }),
-        member.leftChildId
-          ? findMemberById(member.leftChildId)
-          : Promise.resolve(null),
-        member.rightChildId
-          ? findMemberById(member.rightChildId)
-          : Promise.resolve(null),
-      ]);
+    const [
+      parent,
+      allOutgoingRaw,
+      incomingRaw,
+      leftChild,
+      rightChild,
+      declinedPairs,
+      contributionAmount,
+      referralSummary,
+      owesPayment,
+    ] = await Promise.all([
+      populateMemberRef(member.parentId, [
+        "memberId",
+        "fullName",
+        "email",
+        "phone",
+        "bankName",
+        "bankCode",
+        "accountNumber",
+        "accountName",
+      ]),
+      findContributions({ fromMemberId: member.id }),
+      findContributions({ toMemberId: member.id }),
+      member.leftChildId
+        ? findMemberById(member.leftChildId)
+        : Promise.resolve(null),
+      member.rightChildId
+        ? findMemberById(member.rightChildId)
+        : Promise.resolve(null),
+      findContributions({
+        toMemberId: member.id,
+        status: "declined",
+      }),
+      getContributionAmount(),
+      getReferralDashboardSummary(member),
+      memberOwesPaymentForCurrentCycle(member),
+    ]);
 
-    const allOutgoing = await enrichContributionsWithProofUrls(
-      await populateContributions(allOutgoingRaw)
+    const [allOutgoingPopulated, incomingPopulated] = await Promise.all([
+      populateContributions(allOutgoingRaw),
+      populateContributions(incomingRaw),
+    ]);
+
+    const incomingNeedingProof = incomingPopulated.filter(
+      (c) =>
+        c.paymentProofPath && INCOMING_PROOF_STATUSES.has(c.status)
     );
-    const incomingContributions = await enrichContributionsWithProofUrls(
-      await populateContributions(incomingRaw)
+    const incomingWithProofUrls =
+      incomingNeedingProof.length > 0
+        ? await enrichContributionsWithProofUrls(incomingNeedingProof)
+        : [];
+    const proofUrlById = new Map(
+      incomingWithProofUrls.map((c) => [c.id, c.paymentProofUrl ?? null])
     );
+
+    const incomingContributions = incomingPopulated.map((c) => ({
+      ...c,
+      paymentProofUrl: proofUrlById.get(c.id) ?? null,
+    }));
+
+    const allOutgoing = allOutgoingPopulated.map((c) => ({
+      ...c,
+      paymentProofUrl: null as string | null,
+    }));
 
     const outgoingContributions = allOutgoing.filter(
       (c) => (c.cycleNumber ?? 1) === currentCycle
@@ -71,11 +111,6 @@ export async function GET(
       leftChild?.hasPaidContribution && rightChild?.hasPaidContribution;
 
     const paymentStatus = getPaymentStatus(member, outgoingContributions);
-
-    const declinedPairs = await findContributions({
-      toMemberId: member.id,
-      status: "declined",
-    });
 
     const declinedFromIds = new Set(
       declinedPairs.map((c) => c.fromMemberId)
@@ -95,7 +130,6 @@ export async function GET(
       };
     });
 
-    const owesPayment = await memberOwesPaymentForCurrentCycle(member);
     const cyclesCompleted = member.cyclesCompleted ?? 0;
     const hasActiveOutgoingPayment = outgoingContributions.some(
       (c) => c.status === "pending" || c.status === "awaiting_confirmation"
@@ -112,7 +146,6 @@ export async function GET(
       cyclesCompleted > 0 &&
       member.status === "pending" &&
       !member.hasPaidContribution;
-    const contributionAmount = await getContributionAmount();
     const contributionOwed = owesPayment
       ? computeContributionOwed(member, outgoingContributions, contributionAmount)
       : 0;
@@ -163,6 +196,7 @@ export async function GET(
         awaitingPaymentConfirmation,
         contributionOwed,
       },
+      referrals: referralSummary,
     });
   } catch (error) {
     const message =

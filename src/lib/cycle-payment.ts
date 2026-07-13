@@ -165,7 +165,15 @@ export async function createOutgoingContributionForCycle(
       status: "pending",
     });
     await syncContributionTransactions(contribution);
-    return contribution;
+
+    const refreshed = await findMemberById(member.id);
+    if (refreshed) {
+      const { applyContributionCreditIfEligible } = await import("@/lib/referrals");
+      await applyContributionCreditIfEligible(refreshed);
+    }
+
+    const afterCredit = await getOutgoingForCycle(member.id, cycleNumber);
+    return afterCredit ?? contribution;
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       return getOutgoingForCycle(member.id, cycleNumber);

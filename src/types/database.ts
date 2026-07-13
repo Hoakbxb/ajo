@@ -7,7 +7,13 @@ export type ContributionStatus =
   | "confirmed"
   | "declined";
 
-export type TransactionKind = "sent" | "received" | "payout";
+export type TransactionKind =
+  | "sent"
+  | "received"
+  | "payout"
+  | "referral"
+  | "referral_credit";
+export type ReferralStatus = "pending" | "qualified" | "paid";
 export type TransactionStatus = ContributionStatus;
 
 export interface MemberRow {
@@ -41,6 +47,9 @@ export interface MemberRow {
   suspended_by: string | null;
   awaiting_rematch_since: string | null;
   rematch_after: string | null;
+  referred_by_member_id: string | null;
+  referral_balance: number;
+  contribution_credit: number;
   joined_at: string;
   created_at: string;
   updated_at: string;
@@ -111,6 +120,9 @@ export interface Member {
   suspendedBy?: string | null;
   awaitingRematchSince: Date | null;
   rematchAfter: Date | null;
+  referredByMemberId: string | null;
+  referralBalance: number;
+  contributionCredit: number;
   joinedAt: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -195,6 +207,34 @@ export interface PasswordResetTokenRow {
   token_hash: string;
   expires_at: string;
   used_at: string | null;
+  created_at: string;
+}
+
+export interface ReferralRow {
+  id: string;
+  referrer_member_id: string;
+  referred_member_id: string;
+  reward_amount: number;
+  status: ReferralStatus;
+  qualified_at: string | null;
+  created_at: string;
+}
+
+export interface Referral {
+  id: string;
+  referrerMemberId: string;
+  referredMemberId: string;
+  rewardAmount: number;
+  status: ReferralStatus;
+  qualifiedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ReferralRedemptionRow {
+  id: string;
+  member_id: string;
+  amount: number;
+  contribution_id: string | null;
   created_at: string;
 }
 

@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       accountNumber,
       accountName,
       password,
+      referralCode,
     } = body;
 
     if (
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
       accountName: accountName.trim(),
       authUserId: authUser.id,
       password,
+      referralCode: referralCode?.trim() || undefined,
     });
 
     await signInWithEmailPassword(normalizedEmail, password);

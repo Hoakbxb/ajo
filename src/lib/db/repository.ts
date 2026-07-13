@@ -201,6 +201,9 @@ export async function createMember(
     awaitingRematchSince?: Date | null;
     rematchAfter?: Date | null;
     joinedAt?: Date;
+    referredByMemberId?: string | null;
+    referralBalance?: number;
+    contributionCredit?: number;
   }
 ): Promise<Member> {
   const { data, error } = await getSupabaseAdmin()
@@ -236,6 +239,9 @@ export async function createMember(
       awaiting_rematch_since:
         input.awaitingRematchSince?.toISOString() ?? null,
       rematch_after: input.rematchAfter?.toISOString() ?? null,
+      referred_by_member_id: input.referredByMemberId ?? null,
+      referral_balance: input.referralBalance ?? 0,
+      contribution_credit: input.contributionCredit ?? 0,
       joined_at: input.joinedAt?.toISOString() ?? new Date().toISOString(),
     })
     .select("*")
@@ -811,4 +817,176 @@ export async function markPasswordResetTokenUsed(id: string): Promise<void> {
     .update({ used_at: new Date().toISOString() })
     .eq("id", id);
   throwIfError(error, "markPasswordResetTokenUsed");
+}
+
+// ─── Referrals ───────────────────────────────────────────────────────────────
+
+const REFERRALS = "referrals";
+const REFERRAL_REDEMPTIONS = "referral_redemptions";
+
+function toReferral(row: {
+  id: string;
+  referrer_member_id: string;
+  referred_member_id: string;
+  reward_amount: number;
+  status: string;
+  qualified_at: string | null;
+  created_at: string;
+}): import("@/types/database").Referral {
+  return {
+    id: row.id,
+    referrerMemberId: row.referrer_member_id,
+    referredMemberId: row.referred_member_id,
+    rewardAmount: row.reward_amount,
+    status: row.status as import("@/types/database").ReferralStatus,
+    qualifiedAt: row.qualified_at ? new Date(row.qualified_at) : null,
+    createdAt: new Date(row.created_at),
+  };
+}
+
+export async function findMemberByMemberId(
+  memberId: string
+): Promise<Member | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(MEMBERS)
+    .select("*")
+    .eq("member_id", memberId.trim().toUpperCase())
+    .maybeSingle();
+  throwIfError(error, "findMemberByMemberId");
+  return data ? toMember(data as MemberRow) : null;
+}
+
+export async function createReferral(input: {
+  referrerMemberId: string;
+  referredMemberId: string;
+  rewardAmount: number;
+}): Promise<import("@/types/database").Referral> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(REFERRALS)
+    .insert({
+      referrer_member_id: input.referrerMemberId,
+      referred_member_id: input.referredMemberId,
+      reward_amount: input.rewardAmount,
+      status: "pending",
+    })
+    .select("*")
+    .single();
+  throwIfError(error, "createReferral");
+  return toReferral(data);
+}
+
+export async function findReferralByReferredMemberId(
+  referredMemberId: string
+): Promise<import("@/types/database").Referral | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(REFERRALS)
+    .select("*")
+    .eq("referred_member_id", referredMemberId)
+    .maybeSingle();
+  throwIfError(error, "findReferralByReferredMemberId");
+  return data ? toReferral(data) : null;
+}
+
+export async function findReferralsByReferrerId(
+  referrerMemberId: string
+): Promise<import("@/types/database").Referral[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from(REFERRALS)
+    .select("*")
+    .eq("referrer_member_id", referrerMemberId)
+    .order("created_at", { ascending: false });
+  throwIfError(error, "findReferralsByReferrerId");
+  return (data ?? []).map(toReferral);
+}
+
+export async function updateReferral(
+  id: string,
+  patch: {
+    status?: import("@/types/database").ReferralStatus;
+    qualifiedAt?: Date | null;
+  }
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.qualifiedAt !== undefined)
+    row.qualified_at = patch.qualifiedAt?.toISOString() ?? null;
+  const { error } = await getSupabaseAdmin()
+    .from(REFERRALS)
+    .update(row)
+    .eq("id", id);
+  throwIfError(error, "updateReferral");
+}
+
+export async function createReferralRedemption(input: {
+  memberId: string;
+  amount: number;
+  contributionId?: string | null;
+}): Promise<void> {
+  const { error } = await getSupabaseAdmin().from(REFERRAL_REDEMPTIONS).insert({
+    member_id: input.memberId,
+    amount: input.amount,
+    contribution_id: input.contributionId ?? null,
+  });
+  throwIfError(error, "createReferralRedemption");
+}
+
+export async function upsertReferralTransaction(input: {
+  memberId: string;
+  amount: number;
+  kind: "referral" | "referral_credit";
+  counterpartyMemberId?: string | null;
+  counterpartyName?: string | null;
+  contributionId?: string | null;
+  reference: string;
+  occurredAt: Date;
+}): Promise<void> {
+  const row = {
+    member_id: input.memberId,
+    kind: input.kind,
+    amount: input.amount,
+    status: "confirmed" as TransactionStatus,
+    counterparty_member_id: input.counterpartyMemberId ?? null,
+    counterparty_name: input.counterpartyName ?? null,
+    contribution_id: input.contributionId ?? null,
+    cycle_number: null,
+    reference: input.reference,
+    occurred_at: input.occurredAt.toISOString(),
+  };
+
+  const { data: existing, error: findError } = await getSupabaseAdmin()
+    .from(TRANSACTIONS)
+    .select("id")
+    .eq("member_id", input.memberId)
+    .eq("reference", input.reference)
+    .maybeSingle();
+  throwIfError(findError, "upsertReferralTransaction.find");
+
+  if (existing) {
+    const { error } = await getSupabaseAdmin()
+      .from(TRANSACTIONS)
+      .update({
+        amount: row.amount,
+        status: row.status,
+        occurred_at: row.occurred_at,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    throwIfError(error, "upsertReferralTransaction.update");
+    return;
+  }
+
+  const { error } = await getSupabaseAdmin().from(TRANSACTIONS).insert(row);
+  throwIfError(error, "upsertReferralTransaction.insert");
+}
+
+export async function countQualifiedReferrals(
+  referrerMemberId: string
+): Promise<number> {
+  const { count, error } = await getSupabaseAdmin()
+    .from(REFERRALS)
+    .select("*", { count: "exact", head: true })
+    .eq("referrer_member_id", referrerMemberId)
+    .eq("status", "qualified");
+  throwIfError(error, "countQualifiedReferrals");
+  return count ?? 0;
 }

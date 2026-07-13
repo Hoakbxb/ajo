@@ -119,4 +119,14 @@ export interface MemberDashboardData {
     awaitingPaymentConfirmation: boolean;
     contributionOwed: number;
   };
+  referrals: {
+    referralCode: string;
+    referralLink: string;
+    balance: number;
+    contributionCredit: number;
+    withdrawalThreshold: number;
+    rewardPerReferral: number;
+    canWithdraw: boolean;
+    qualifiedCount: number;
+  };
 }

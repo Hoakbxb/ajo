@@ -45,6 +45,9 @@ export function toMember(row: MemberRow): Member {
     suspendedBy: row.suspended_by,
     awaitingRematchSince: parseDate(row.awaiting_rematch_since),
     rematchAfter: parseDate(row.rematch_after),
+    referredByMemberId: row.referred_by_member_id,
+    referralBalance: row.referral_balance ?? 0,
+    contributionCredit: row.contribution_credit ?? 0,
     joinedAt: new Date(row.joined_at),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -131,6 +134,12 @@ export function memberPatchToRow(
     row.awaiting_rematch_since = patch.awaitingRematchSince?.toISOString() ?? null;
   if (patch.rematchAfter !== undefined)
     row.rematch_after = patch.rematchAfter?.toISOString() ?? null;
+  if (patch.referredByMemberId !== undefined)
+    row.referred_by_member_id = patch.referredByMemberId;
+  if (patch.referralBalance !== undefined)
+    row.referral_balance = patch.referralBalance;
+  if (patch.contributionCredit !== undefined)
+    row.contribution_credit = patch.contributionCredit;
   return row;
 }
 
