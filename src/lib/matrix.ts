@@ -110,6 +110,8 @@ function slotsFilled(member: Member): number {
 }
 
 async function isEligibleUpline(member: Member): Promise<boolean> {
+  await clearStaleChildPointers(member);
+
   return (
     canReceiveMemberPayments(member) &&
     member.status === "active" &&
@@ -119,24 +121,88 @@ async function isEligibleUpline(member: Member): Promise<boolean> {
   );
 }
 
-function shuffleMembers(members: Member[]): Member[] {
-  const copy = [...members];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+/** Clear left/right pointers when the child no longer lists this member as parent. */
+async function clearStaleChildPointers(member: Member): Promise<void> {
+  const patch: Partial<Member> = {};
+
+  if (member.leftChildId) {
+    const left = await findMemberById(member.leftChildId);
+    if (!left || left.parentId !== member.id) {
+      patch.leftChildId = null;
+      member.leftChildId = null;
+    }
   }
-  return copy;
+
+  if (member.rightChildId) {
+    const right = await findMemberById(member.rightChildId);
+    if (!right || right.parentId !== member.id) {
+      patch.rightChildId = null;
+      member.rightChildId = null;
+    }
+  }
+
+  if (Object.keys(patch).length > 0) {
+    await updateMember(member.id, patch);
+  }
 }
 
-/** Random upline pick — prefer members with fewer completed cycles so nobody is left behind. */
-function pickFairRandomMember(members: Member[]): Member | null {
+/** When a member entered (or re-entered) the merge wait queue. */
+function mergeWaitStartedAt(member: Member): number {
+  return (member.awaitingRematchSince ?? member.joinedAt).getTime();
+}
+
+/** True once the member has received at least one cycle payout. */
+function hasReceivedCyclePayment(member: Member): boolean {
+  return (member.cyclesCompleted ?? 0) > 0 || (member.payoutAmount ?? 0) > 0;
+}
+
+/**
+ * Fair merge order:
+ * 1. People who have never received a cycle payment go first
+ * 2. Within that, longest wait goes first
+ * 3. People rematching after a payout wait behind first-timers
+ */
+function sortMergeQueueFair(members: Member[]): Member[] {
+  return [...members].sort((a, b) => {
+    const aPaid = hasReceivedCyclePayment(a) ? 1 : 0;
+    const bPaid = hasReceivedCyclePayment(b) ? 1 : 0;
+    if (aPaid !== bPaid) return aPaid - bPaid;
+
+    const waitDiff = mergeWaitStartedAt(a) - mergeWaitStartedAt(b);
+    if (waitDiff !== 0) return waitDiff;
+
+    return a.joinedAt.getTime() - b.joinedAt.getTime();
+  });
+}
+
+/**
+ * Round-robin upline pick:
+ * 1. Never-paid with 0 downlines — random one-by-one (don't fill both slots first)
+ * 2. Never-paid with 1 downline — only after every never-paid has one
+ * 3. Everyone else — random among fewest completed cycles
+ */
+function pickFairestUpline(members: Member[]): Member | null {
   if (members.length === 0) return null;
   if (members.length === 1) return members[0];
 
-  const minCycles = Math.min(...members.map((m) => m.cyclesCompleted ?? 0));
-  const tier = members.filter((m) => (m.cyclesCompleted ?? 0) === minCycles);
-  const pool = tier.length > 0 ? tier : members;
-  return pool[randomInt(pool.length)] ?? null;
+  const neverPaid = members.filter((m) => !hasReceivedCyclePayment(m));
+  const alreadyPaid = members.filter((m) => hasReceivedCyclePayment(m));
+
+  const neverPaidEmpty = neverPaid.filter((m) => slotsFilled(m) === 0);
+  if (neverPaidEmpty.length > 0) {
+    return neverPaidEmpty[randomInt(neverPaidEmpty.length)] ?? null;
+  }
+
+  const neverPaidOneSlot = neverPaid.filter((m) => slotsFilled(m) === 1);
+  if (neverPaidOneSlot.length > 0) {
+    return neverPaidOneSlot[randomInt(neverPaidOneSlot.length)] ?? null;
+  }
+
+  const pool = alreadyPaid.length > 0 ? alreadyPaid : members;
+  const minCycles = Math.min(...pool.map((m) => m.cyclesCompleted ?? 0));
+  const tier = pool.filter((m) => (m.cyclesCompleted ?? 0) === minCycles);
+  const finalPool = tier.length > 0 ? tier : pool;
+  return finalPool[randomInt(finalPool.length)] ?? null;
 }
 
 async function getSubtreeIds(anchor: Member): Promise<string[]> {
@@ -218,7 +284,7 @@ export async function findPaymentSlot(
 
   if (eligible.length === 0) return null;
 
-  const parent = pickFairRandomMember(eligible);
+  const parent = pickFairestUpline(eligible);
   if (!parent) return null;
 
   const position = await nextOpenPositionForUpline(parent);
@@ -413,15 +479,17 @@ async function restartCycle(member: Member) {
       await updateMember(child.id, {
         parentId: null,
         rematchAfter: new Date(0),
+        awaitingRematchSince: child.awaitingRematchSince ?? child.joinedAt,
       });
     } else {
       await updateMember(child.id, { parentId: null });
     }
   }
 
-  await tryAssignMemberToPaymentSlot(member, subtreeIds, {
-    allowBeforeMatrixComplete: true,
-    scheduleWaitOnNoSlot: true,
+  // Enter the FIFO wait queue instead of jumping ahead of older waiters.
+  await updateMember(member.id, {
+    awaitingRematchSince: new Date(),
+    rematchAfter: new Date(0),
   });
 
   await processPendingMerges();
@@ -444,7 +512,7 @@ export const resetAndRematchAfterMatrixComplete = async (memberId: string) => {
 export const checkAndProcessPayout = checkAndCompleteCycle;
 
 export async function processPendingMerges() {
-  const queue = shuffleMembers(
+  const queue = sortMergeQueueFair(
     await findMembers({
       status: "pending",
       parentId: null,
@@ -458,6 +526,12 @@ export async function processPendingMerges() {
     await syncPaidStateForCurrentCycle(member);
     const fresh = await findMemberById(member.id);
     if (fresh?.hasPaidContribution && fresh.status === "active") continue;
+    // Keep original wait start so rematchAfter delays don't reset FIFO order.
+    if (!fresh?.awaitingRematchSince && !member.awaitingRematchSince) {
+      await updateMember(member.id, {
+        awaitingRematchSince: member.joinedAt,
+      });
+    }
     await tryAssignMemberToPaymentSlot(fresh ?? member, [], {
       allowBeforeMatrixComplete: true,
       scheduleWaitOnNoSlot: true,
@@ -535,6 +609,8 @@ export async function joinMatrix(data: {
   }
 
   try {
+    // Waiters who registered earlier get open slots before this new joiner.
+    await processPendingMerges();
     const result = await tryAssignMemberToPaymentSlot(member, [], {
       scheduleWaitOnNoSlot: true,
     });
@@ -753,10 +829,8 @@ export async function syncMemberDashboardState(memberId: string): Promise<void> 
   });
   if (activeOutgoing) return;
 
-  await tryAssignMemberToPaymentSlot(member, [], {
-    allowBeforeMatrixComplete: true,
-    scheduleWaitOnNoSlot: true,
-  });
+  // Always run the full FIFO queue — never assign this member alone (jumping ahead).
+  await processPendingMerges();
 }
 
 export async function expireStaleContributions() {
@@ -1286,12 +1360,8 @@ export async function removeMemberFromMatrixAndRematchPayers(
       parentId: null,
       status: "pending",
       hasPaidContribution: false,
+      awaitingRematchSince: payer.awaitingRematchSince ?? payer.joinedAt,
       rematchAfter: new Date(0),
-    });
-
-    await tryAssignMemberToPaymentSlot(payer, [...exclude], {
-      allowBeforeMatrixComplete: true,
-      scheduleWaitOnNoSlot: true,
     });
   }
 
@@ -1307,11 +1377,8 @@ export async function removeMemberFromMatrixAndRematchPayers(
         parentId: null,
         status: "pending",
         hasPaidContribution: false,
+        awaitingRematchSince: child.awaitingRematchSince ?? child.joinedAt,
         rematchAfter: new Date(0),
-      });
-      await tryAssignMemberToPaymentSlot(child, [...exclude], {
-        allowBeforeMatrixComplete: true,
-        scheduleWaitOnNoSlot: true,
       });
     } else {
       await updateMember(child.id, { parentId: null });

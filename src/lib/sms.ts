@@ -13,7 +13,7 @@ type SmsConfig = {
 function getSmsConfig(): SmsConfig | null {
   const username = process.env.NIGERIA_BULK_SMS_USERNAME?.trim();
   const password = process.env.NIGERIA_BULK_SMS_PASSWORD;
-  const sender = process.env.NIGERIA_BULK_SMS_SENDER?.trim() || "wealthcircle";
+  const sender = process.env.NIGERIA_BULK_SMS_SENDER?.trim() || "wcircle";
 
   if (!username || !password) {
     return null;
