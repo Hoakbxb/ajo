@@ -7,6 +7,7 @@ import type {
   AdminContributionAction,
   AdminContributionListItem,
 } from "@/types/admin";
+import { getContributionId } from "@/lib/contribution-id";
 import { ProButton } from "@/app/(app)/dashboard/components/dashboard-ui";
 import AdminContributionAmountForm from "./AdminContributionAmountForm";
 
@@ -56,6 +57,7 @@ export default function AdminContributionActions({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showAmountForm, setShowAmountForm] = useState(false);
+  const contributionId = getContributionId(contribution);
 
   const status = contribution.status;
   const isConfirmed = status === "confirmed";
@@ -70,7 +72,7 @@ export default function AdminContributionActions({
   ) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/contributions/${contribution._id}`, {
+      const res = await fetch(`/api/admin/contributions/${contributionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, amount }),
@@ -116,7 +118,7 @@ export default function AdminContributionActions({
     return (
       <div className="flex flex-wrap items-center gap-2">
         <Link
-          href={`/admin/contributions/${contribution._id}`}
+          href={`/admin/contributions/${contributionId}`}
           className={variants.link}
         >
           View
@@ -132,7 +134,7 @@ export default function AdminContributionActions({
     return (
       <div className="flex min-w-[220px] flex-wrap gap-1.5">
         <Link
-          href={`/admin/contributions/${contribution._id}`}
+          href={`/admin/contributions/${contributionId}`}
           className={variants.link}
         >
           Manage
@@ -193,7 +195,7 @@ export default function AdminContributionActions({
         {showAmountForm && canModify && (
           <div className="mt-2 w-full basis-full">
             <AdminContributionAmountForm
-              contributionId={contribution._id}
+              contributionId={contributionId}
               currentAmount={contribution.amount}
               onSuccess={(message) => {
                 onMessage?.(message);
@@ -262,7 +264,7 @@ export default function AdminContributionActions({
 
       {showAmountForm && canModify && (
         <AdminContributionAmountForm
-          contributionId={contribution._id}
+          contributionId={contributionId}
           currentAmount={contribution.amount}
           label={`${contribution.fromMemberId.fullName} → ${contribution.toMemberId.fullName}`}
           onSuccess={(message) => {

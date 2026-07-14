@@ -10,6 +10,7 @@ import {
   formatContributionStatusLabel,
 } from "@/lib/payment-status";
 import type { AdminContributionListItem } from "@/types/admin";
+import { getContributionId } from "@/lib/contribution-id";
 import {
   ProBadge,
   ProCard,
@@ -30,6 +31,7 @@ export default function AdminContributionDetail({
   payeeCandidates: PayeeCandidate[];
 }) {
   const [message, setMessage] = useState("");
+  const contributionId = getContributionId(contribution);
 
   return (
     <div className="space-y-6">
@@ -103,7 +105,7 @@ export default function AdminContributionDetail({
         >
           <AdminReassignPayeeForm
             mode="contribution"
-            contributionId={contribution._id}
+            contributionId={contributionId}
             payerMemberId={contribution.fromMemberId._id}
             currentPayeeName={contribution.toMemberId.fullName}
             currentPayeeMemberId={contribution.toMemberId.memberId}

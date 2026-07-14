@@ -35,6 +35,7 @@ import {
   paginate,
 } from "@/lib/admin-table";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
+import { getContributionId } from "@/lib/contribution-id";
 import AdminContributionActions from "./AdminContributionActions";
 
 function CircleRemainingBadge({
@@ -181,7 +182,8 @@ export default function AdminContributionsContent({
 
   const cancellablePageIds = paged.items
     .filter((c) => c.status !== "confirmed")
-    .map((c) => c._id);
+    .map((c) => getContributionId(c))
+    .filter(Boolean);
   const allPageSelected =
     cancellablePageIds.length > 0 &&
     cancellablePageIds.every((id) => selected.has(id));
@@ -201,7 +203,7 @@ export default function AdminContributionsContent({
 
   async function bulkCancel() {
     const contributionIds = [...selected].filter((id) => {
-      const item = contributions.find((c) => c._id === id);
+      const item = contributions.find((c) => getContributionId(c) === id);
       return item && item.status !== "confirmed";
     });
     if (contributionIds.length === 0) {
@@ -412,18 +414,20 @@ export default function AdminContributionsContent({
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.items.map((contribution) => (
-                    <tr key={contribution._id} className="border-b border-slate-100 last:border-b-0">
+                  {paged.items.map((contribution) => {
+                    const contributionId = getContributionId(contribution);
+                    return (
+                    <tr key={contributionId} className="border-b border-slate-100 last:border-b-0">
                       <td className="px-4 py-3.5">
                         {contribution.status !== "confirmed" && (
                           <input
                             type="checkbox"
-                            checked={selected.has(contribution._id)}
+                            checked={selected.has(contributionId)}
                             onChange={() => {
                               setSelected((prev) => {
                                 const next = new Set(prev);
-                                if (next.has(contribution._id)) next.delete(contribution._id);
-                                else next.add(contribution._id);
+                                if (next.has(contributionId)) next.delete(contributionId);
+                                else next.add(contributionId);
                                 return next;
                               });
                             }}
@@ -453,12 +457,20 @@ export default function AdminContributionsContent({
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-sm text-slate-500">{formatDisplayDateTime(contribution.createdAt)}</td>
-                      <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900">{formatNaira(contribution.amount)}</td>
+                      <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900">
+                        <Link
+                          href={`/admin/contributions/${contributionId}`}
+                          className="hover:text-amber-700"
+                        >
+                          {formatNaira(contribution.amount)}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3.5">
                         <AdminContributionActions contribution={contribution} compact onMessage={setMessage} />
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

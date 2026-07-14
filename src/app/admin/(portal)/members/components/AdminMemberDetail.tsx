@@ -10,6 +10,7 @@ import {
   contributionStatusBadgeClass,
   formatContributionStatusLabel,
 } from "@/lib/payment-status";
+import { getContributionId } from "@/lib/contribution-id";
 import AdminMemberEditForm from "./AdminMemberEditForm";
 import AdminReassignPayeeForm, {
   type PayeeCandidate,
@@ -578,7 +579,8 @@ export default function AdminMemberDetail({
 }
 
 type ContributionListItem = {
-  _id: string;
+  _id?: string;
+  id?: string;
   amount: number;
   status: string;
   cycleNumber?: number;
@@ -607,10 +609,11 @@ function ContributionList({
               direction === "to"
                 ? item.toMemberId
                 : item.fromMemberId;
+            const contributionId = getContributionId(item);
             if (!counterparty) return null;
             return (
               <div
-                key={item._id}
+                key={contributionId}
                 className="rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -622,15 +625,26 @@ function ContributionList({
                       Cycle {item.cycleNumber ?? 1} · {formatDisplayDateTime(item.createdAt)}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <Link
+                    href={`/admin/contributions/${contributionId}`}
+                    className="text-sm font-semibold text-slate-900 hover:text-amber-700"
+                  >
                     {formatNaira(item.amount)}
-                  </p>
+                  </Link>
                 </div>
-                <span
-                  className={`mt-2 inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${contributionStatusBadgeClass(item.status)}`}
-                >
-                  {formatContributionStatusLabel(item.status)}
-                </span>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${contributionStatusBadgeClass(item.status)}`}
+                  >
+                    {formatContributionStatusLabel(item.status)}
+                  </span>
+                  <Link
+                    href={`/admin/contributions/${contributionId}`}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-900"
+                  >
+                    Manage payment →
+                  </Link>
+                </div>
               </div>
             );
           })}

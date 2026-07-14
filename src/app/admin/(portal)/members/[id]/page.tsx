@@ -5,6 +5,7 @@ import {
   findMemberById,
 } from "@/lib/db/repository";
 import { populateContributions, populateMemberRef } from "@/lib/db/populate";
+import { withContributionId } from "@/lib/contribution-id";
 import AdminMemberDetail from "../components/AdminMemberDetail";
 
 export default async function AdminMemberDetailPage({
@@ -31,8 +32,12 @@ export default async function AdminMemberDetailPage({
   return (
     <AdminMemberDetail
       member={JSON.parse(JSON.stringify({ ...member, parentId: parent }))}
-      outgoing={JSON.parse(JSON.stringify(outgoing))}
-      incoming={JSON.parse(JSON.stringify(incoming))}
+      outgoing={JSON.parse(
+        JSON.stringify(outgoing.map((item) => withContributionId(item)))
+      )}
+      incoming={JSON.parse(
+        JSON.stringify(incoming.map((item) => withContributionId(item)))
+      )}
       allMembers={JSON.parse(
         JSON.stringify(
           allMembers

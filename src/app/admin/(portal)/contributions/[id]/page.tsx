@@ -5,7 +5,10 @@ import {
 } from "@/lib/db/repository";
 import { populateContributions } from "@/lib/db/populate";
 import { enrichContributionsWithProofUrls } from "@/lib/payment-proof";
+import { withContributionId } from "@/lib/contribution-id";
 import AdminContributionDetail from "../components/AdminContributionDetail";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminContributionDetailPage({
   params,
@@ -13,17 +16,27 @@ export default async function AdminContributionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contribution = await findContributionById(id);
+  const contributionId = id?.trim();
+  if (!contributionId || contributionId === "undefined") {
+    notFound();
+  }
+
+  const contribution = await findContributionById(contributionId);
   if (!contribution) notFound();
 
-  const [populated, allMembers] = await Promise.all([
+  const [populatedRows, allMembers] = await Promise.all([
     enrichContributionsWithProofUrls(
       await populateContributions([contribution])
-    ).then(([c]) => c),
+    ),
     findAllMembers(),
   ]);
 
-  const serialized = JSON.parse(JSON.stringify(populated));
+  const populated = populatedRows[0];
+  if (!populated) notFound();
+
+  const serialized = JSON.parse(
+    JSON.stringify(withContributionId(populated))
+  );
   const payeeCandidates = allMembers
     .filter(
       (m) =>

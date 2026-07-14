@@ -1,6 +1,7 @@
 import { findContributions, findAllMembers } from "@/lib/db/repository";
 import { populateContributions } from "@/lib/db/populate";
 import { getMemberCircleProgress } from "@/lib/admin-matrix";
+import { withContributionId } from "@/lib/contribution-id";
 import AdminContributionsContent from "./components/AdminContributionsContent";
 
 export default async function AdminContributionsPage() {
@@ -22,10 +23,10 @@ export default async function AdminContributionsPage() {
         : String(contribution.toMemberId);
     const payee = byId.get(payeeId);
 
-    return {
+    return withContributionId({
       ...contribution,
       payeeCircle: payee ? getMemberCircleProgress(payee, byId) : null,
-    };
+    });
   });
 
   return (
