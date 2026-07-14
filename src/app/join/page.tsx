@@ -1,6 +1,9 @@
+import { Suspense } from "react";
 import JoinForm from "@/components/JoinForm";
 import { AuthLink, AuthShell } from "@/components/auth/auth-ui";
 import { SITE_NAME } from "@/lib/brand";
+
+export const dynamic = "force-dynamic";
 
 export default async function JoinPage({
   searchParams,
@@ -37,7 +40,9 @@ export default async function JoinPage({
         </p>
       }
     >
-      <JoinForm referralCode={ref} />
+      <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-slate-100" />}>
+        <JoinForm referralCode={ref} />
+      </Suspense>
     </AuthShell>
   );
 }

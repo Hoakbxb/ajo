@@ -16,18 +16,25 @@ import {
   REFERRAL_WITHDRAWAL_THRESHOLD,
   SITE_URL,
 } from "@/lib/constants";
+import {
+  normalizeReferralCode,
+  REFERRAL_COOKIE,
+} from "@/lib/referral-code";
 import type { Member, Referral } from "@/types/database";
+
+export { normalizeReferralCode, REFERRAL_COOKIE };
 
 export function buildReferralLink(memberId: string): string {
   const base = SITE_URL.replace(/\/$/, "");
-  return `${base}/join?ref=${encodeURIComponent(memberId)}`;
+  return `${base}/join?ref=${encodeURIComponent(memberId.trim().toUpperCase())}`;
 }
 
 export async function resolveReferrer(
   referralCode: string | undefined | null
 ): Promise<Member | null> {
-  if (!referralCode?.trim()) return null;
-  return findMemberByMemberId(referralCode.trim());
+  const code = normalizeReferralCode(referralCode);
+  if (!code) return null;
+  return findMemberByMemberId(code);
 }
 
 export async function registerReferral(

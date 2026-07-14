@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { joinMatrix } from "@/lib/matrix";
 import {
@@ -9,6 +10,10 @@ import {
   deleteAuthUser,
   signInWithEmailPassword,
 } from "@/lib/auth";
+import {
+  normalizeReferralCode,
+  REFERRAL_COOKIE,
+} from "@/lib/referral-code";
 
 export async function POST(request: Request) {
   let authUserId: string | null = null;
@@ -25,6 +30,12 @@ export async function POST(request: Request) {
       password,
       referralCode,
     } = body;
+
+    const cookieStore = await cookies();
+    const resolvedReferralCode =
+      normalizeReferralCode(referralCode) ||
+      normalizeReferralCode(cookieStore.get(REFERRAL_COOKIE)?.value) ||
+      undefined;
 
     if (
       !fullName?.trim() ||
@@ -86,12 +97,12 @@ export async function POST(request: Request) {
       accountName: accountName.trim(),
       authUserId: authUser.id,
       password,
-      referralCode: referralCode?.trim() || undefined,
+      referralCode: resolvedReferralCode,
     });
 
     await signInWithEmailPassword(normalizedEmail, password);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: "Successfully joined the community",
         member: {
@@ -111,6 +122,11 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
+    response.cookies.set(REFERRAL_COOKIE, "", {
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
   } catch (error) {
     if (authUserId) {
       try {

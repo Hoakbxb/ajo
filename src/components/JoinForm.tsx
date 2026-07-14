@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { NIGERIAN_BANKS } from "@/lib/nigerian-banks";
 import {
   AuthError,
@@ -12,8 +12,13 @@ import {
   authSelectClass,
   StepIndicator,
 } from "@/components/auth/auth-ui";
+import {
+  normalizeReferralCode,
+  REFERRAL_COOKIE,
+} from "@/lib/referral-code";
 
 const STEPS = ["Personal", "Security", "Payout"];
+const REF_STORAGE_KEY = "wc_referral_code";
 
 type FormState = {
   fullName: string;
@@ -36,6 +41,15 @@ const initialForm: FormState = {
   accountNumber: "",
   accountName: "",
 };
+
+function readCookie(name: string): string {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  if (!match) return "";
+  return decodeURIComponent(match.split("=").slice(1).join("="));
+}
 
 function validateStep(step: number, form: FormState): string | null {
   if (step === 0) {
@@ -69,15 +83,49 @@ function validateStep(step: number, form: FormState): string | null {
 }
 
 export default function JoinForm({
-  referralCode,
+  referralCode: referralCodeProp,
 }: {
   referralCode?: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState<FormState>(initialForm);
+  const [referralCode, setReferralCode] = useState(
+    normalizeReferralCode(referralCodeProp)
+  );
+
+  useEffect(() => {
+    const fromQuery = normalizeReferralCode(searchParams.get("ref"));
+    const fromWindow =
+      typeof window !== "undefined"
+        ? normalizeReferralCode(
+            new URLSearchParams(window.location.search).get("ref")
+          )
+        : "";
+    const fromProp = normalizeReferralCode(referralCodeProp);
+    const fromCookie = normalizeReferralCode(readCookie(REFERRAL_COOKIE));
+    const fromStorage =
+      typeof window !== "undefined"
+        ? normalizeReferralCode(sessionStorage.getItem(REF_STORAGE_KEY))
+        : "";
+
+    const resolved =
+      fromQuery || fromWindow || fromProp || fromCookie || fromStorage;
+    if (!resolved) return;
+
+    setReferralCode(resolved);
+    sessionStorage.setItem(REF_STORAGE_KEY, resolved);
+  }, [searchParams, referralCodeProp]);
+
+  function updateReferralCode(value: string) {
+    const next = normalizeReferralCode(value);
+    setReferralCode(next);
+    if (next) sessionStorage.setItem(REF_STORAGE_KEY, next);
+    else sessionStorage.removeItem(REF_STORAGE_KEY);
+  }
 
   function handleNext() {
     const validationError = validateStep(step, form);
@@ -108,18 +156,21 @@ export default function JoinForm({
 
     try {
       const { confirmPassword: _, ...payload } = form;
+      const code = normalizeReferralCode(referralCode);
       const res = await fetch("/api/members/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           ...payload,
-          referralCode: referralCode?.trim() || undefined,
+          referralCode: code || undefined,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      sessionStorage.removeItem(REF_STORAGE_KEY);
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
@@ -134,11 +185,11 @@ export default function JoinForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <StepIndicator steps={STEPS} currentStep={step} />
-      {referralCode && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+      {referralCode ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           Referred by <span className="font-semibold">{referralCode}</span>
         </div>
-      )}
+      ) : null}
       <AuthError message={error} />
 
       {step === 0 && (
@@ -182,6 +233,20 @@ export default function JoinForm({
               }
               className={authInputClass}
               placeholder="08012345678"
+            />
+          </AuthField>
+
+          <AuthField
+            label="Referral code (optional)"
+            hint="Filled automatically from invite links like /join?ref=FRC-0001"
+          >
+            <input
+              type="text"
+              value={referralCode}
+              onChange={(e) => updateReferralCode(e.target.value)}
+              className={authInputClass}
+              placeholder="FRC-0001"
+              autoComplete="off"
             />
           </AuthField>
         </div>
