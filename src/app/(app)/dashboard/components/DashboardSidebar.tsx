@@ -153,7 +153,10 @@ export default function DashboardSidebar({
             <NavLink
               key={item.label}
               {...item}
-              active={!item.disabled && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))}
+              active={
+                pathname === item.href ||
+                (item.href !== "/dashboard" && pathname.startsWith(item.href))
+              }
             />
           ))}
         </nav>

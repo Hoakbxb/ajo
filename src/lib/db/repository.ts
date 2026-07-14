@@ -192,6 +192,9 @@ export async function createMember(
     | "awaitingRematchSince"
     | "rematchAfter"
     | "joinedAt"
+    | "referredByMemberId"
+    | "referralBalance"
+    | "contributionCredit"
   > & {
     authUserId: string;
     isSuspended?: boolean;

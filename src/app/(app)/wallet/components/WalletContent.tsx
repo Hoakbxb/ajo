@@ -108,12 +108,14 @@ export default function WalletContent({
           value={formatNaira(summary.balance)}
           icon={Wallet}
           accent="emerald"
+          sublabel="Ready to redeem"
         />
         <ProStatCard
           label="Contribution credit"
           value={formatNaira(summary.contributionCredit)}
           icon={Gift}
           accent="indigo"
+          sublabel="Applied to payments"
         />
         <ProStatCard
           label="Qualified referrals"
@@ -122,6 +124,7 @@ export default function WalletContent({
           )}
           icon={Users}
           accent="violet"
+          sublabel="Friends who paid"
         />
       </div>
 
