@@ -4,24 +4,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  CircleHelp,
   CreditCard,
+  Gift,
   LayoutGrid,
   LogOut,
-  Settings,
   User,
-  Wallet,
 } from "lucide-react";
 import { getInitials } from "./dashboard-ui";
 import { SITE_NAME } from "@/lib/brand";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutGrid },
+  { href: "/wallet", label: "Referrals", icon: Gift },
   { href: "/transactions", label: "Transactions", icon: CreditCard },
   { href: "/profile", label: "Profile", icon: User },
-  { href: "/wallet", label: "Referrals", icon: Wallet },
-  { href: "#", label: "Settings", icon: Settings, disabled: true },
-  { href: "#", label: "Support", icon: CircleHelp, disabled: true },
 ];
 
 function NavLink({
@@ -102,7 +98,7 @@ export default function DashboardSidebar({
     router.refresh();
   }
 
-  const mobileNavItems = navItems.filter((item) => !item.disabled).slice(0, 4);
+  const mobileNavItems = navItems;
 
   return (
     <>
@@ -157,7 +153,7 @@ export default function DashboardSidebar({
             <NavLink
               key={item.label}
               {...item}
-              active={!item.disabled && pathname === item.href}
+              active={!item.disabled && (pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href)))}
             />
           ))}
         </nav>

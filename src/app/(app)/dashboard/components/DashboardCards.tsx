@@ -621,9 +621,12 @@ export function ReferralLinkCard({
   referrals: MemberDashboardData["referrals"];
 }) {
   const [copied, setCopied] = useState(false);
+  const reward = referrals.rewardPerReferral ?? 1000;
+  const balance = referrals.balance ?? 0;
+  const threshold = referrals.withdrawalThreshold || 5000;
   const progressPercent = Math.min(
     100,
-    Math.round((referrals.balance / referrals.withdrawalThreshold) * 100)
+    Math.round((balance / threshold) * 100)
   );
 
   async function copyLink() {
@@ -640,14 +643,14 @@ export function ReferralLinkCard({
     <ProCard
       accent="indigo"
       title="Invite friends"
-      description={`Earn ${formatNaira(referrals.rewardPerReferral)} per referral`}
+      description={`Earn ${formatNaira(reward)} per referral`}
       icon={Share2}
       action={
         <Link
           href="/wallet"
           className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
         >
-          View wallet
+          Open referrals
         </Link>
       }
     >
@@ -666,7 +669,7 @@ export function ReferralLinkCard({
             <span>
               Balance:{" "}
               <span className="font-semibold text-slate-900">
-                {formatNaira(referrals.balance)}
+                {formatNaira(balance)}
               </span>
             </span>
             <span className="hidden text-slate-300 sm:inline">·</span>
@@ -703,9 +706,7 @@ export function ReferralLinkCard({
 
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              Progress to {formatNaira(referrals.withdrawalThreshold)} redemption
-            </span>
+            <span>Progress to {formatNaira(threshold)} redemption</span>
             <span>{progressPercent}%</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">

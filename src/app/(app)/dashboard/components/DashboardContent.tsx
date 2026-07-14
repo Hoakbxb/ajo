@@ -426,7 +426,7 @@ export default function DashboardContent({ memberId }: { memberId: string }) {
 
       <DashboardStats data={data} />
 
-      <ReferralLinkCard referrals={referrals} />
+      {referrals ? <ReferralLinkCard referrals={referrals} /> : null}
 
       <ProfileCard member={member} paymentStatus={paymentStatus} />
 
